@@ -76,12 +76,12 @@ class pixie(object):
     def __init__(self, worldToInhabit, name, yxPos, color="FF0000", genome=None):
         ""
         super().__init__(worldToInhabit, name, yxPos)
-        #   List of all functions for idividual genes to choose from
+        self.searchRadius = defaultSearchRadius
         self.energy = defaultEnergy
         self.color = color
         self.genome = genome
         self.shape = "round"
-
+#   List of all functions for idividual genes to choose from
         pixie.listOfFunctions = [
             self.walkTowards, self.move
         ]
@@ -106,7 +106,7 @@ class pixie(object):
     def walkTowards(self, world, otherObject):
         "walk towards the referenced object"
 
-        targetVector = self.getRelativeVector(otherObject)
+        targetVector = self.getRelativeVector(world, otherObject)
         targetDirection = self.getDirection(targetVector)
 
         self.move(world, targetDirection)
@@ -141,7 +141,7 @@ class pixie(object):
         if vector:
             angle = self.getRelativeAngle(relVector=vector)
         elif object:
-            angle = self.getRelativeAngle(otherObject=object)
+            angle = self.getRelativeAngle(world, otherObject=object)
 
         if abs(0 - angle) < (1/8) * math.pi or abs(2*math.pi - angle) < (1/8) * math.pi: # 0° and 360°
             direction = (0,1)
@@ -163,26 +163,26 @@ class pixie(object):
         return direction
 
 
-    def searchNeighbourhood(self, world, searchRadius):
+    def searchNeighbourhood(self, world):
         "scans the surrounding grid and returns a list of all objects within the search radius"
 
         foundObjects = []
         gridSize = np.size(world.grid, 0) # edge length of the grid (only works for square grids)
 
-        for x in range(max(0, self.yxPos[1] - searchRadius), min(gridSize, self.yxPos[1] + searchRadius)):
-            for y in range(max(0, self.yxPos[0] - searchRadius), min(gridSize, self.yxPos[0] + searchRadius)):
-                if math.sqrt((x-self.yxPos[1])**2 + (y - self.yxPos[0])**2) <= searchRadius:
+        for x in range(max(0, self.yxPos[1] - self.searchRadius), min(gridSize, self.yxPos[1] + self.searchRadius)):
+            for y in range(max(0, self.yxPos[0] - self.searchRadius), min(gridSize, self.yxPos[0] + self.searchRadius)):
+                if math.sqrt((x-self.yxPos[1])**2 + (y - self.yxPos[0])**2) <= self.searchRadius:
                     if world.grid[y,x] and world.grid[y,x] != self:
                         foundObjects.append(world.grid[y,x])
         return foundObjects
     
-    def getAllEuclidianDistances(self, world, searchRadius):
+    def getAllEuclidianDistances(self, world):
         """scans the surrounding grid and returns a list of tuples containing all objects
         and their corresponding distances"""
 
         outlist = []
 
-        for neighbour in self.searchNeighbourhood(world, searchRadius):
+        for neighbour in self.searchNeighbourhood(world):
 
             dx = neighbour.yxPos[1] - self.yxPos[1]
             dy = neighbour.yxPos[0] - self.yxPos[0]
@@ -191,7 +191,7 @@ class pixie(object):
             outlist.append((neighbour, distance))
         return outlist
     
-    def getNearest(self, world, searchRadius):
+    def getNearest(self, world):
         "scans the surrounding grid and returns the nearest object"
 
         neighbourhood = self.getAllEuclidianDistances(world, searchRadius)
@@ -203,10 +203,10 @@ class pixie(object):
         else:
             pass
     
-    def getNearestPixie(self, world, searchRadius):
+    def getNearestPixie(self, world):
         "scans the surrounding grid and returns the nearest pixie"
 
-        neighbourhood = self.getAllEuclidianDistances(world, searchRadius)
+        neighbourhood = self.getAllEuclidianDistances(world)
         #print(neighbourhood)
         neighbouring_pixies = []
         
@@ -223,7 +223,7 @@ class pixie(object):
 
     ## scanning neighbourhood for a specific, referenced object
 
-    def getEuclidianDistance(self, world, searchRadius, otherObject):
+    def getEuclidianDistance(self, world, otherObject):
         "returns the absolute distance between the referenced object and self"
 
         dx = otherObject.yxPos[1] - self.yxPos[1]
@@ -232,7 +232,7 @@ class pixie(object):
         distance = math.sqrt(dx**2 + dy**2)
         return distance
 
-    def getRelativeVector(self, world, searchRadius, otherObject):
+    def getRelativeVector(self, world, otherObject):
         """returns a twodimensional tuple containing the y- and x-position of the 
         referenced object relative to self"""
 
@@ -241,17 +241,23 @@ class pixie(object):
 
         return dy, dx
     
-    def getRelativeAngle(self, world, searchRadius, otherObject):
+    def getRelativeAngle(self, world, otherObject):
         """returns the angle of the referenced object in relation to self, angles
         are expressed as radiant with range (-pi/pi), going clockwise from the right"""
 
-        relVector = self.getRelativeVector(world, searchRadius, otherObject)
+        relVector = self.getRelativeVector(world, otherObject)
         relAngle = math.atan2(relVector[0],relVector[1])
         if relAngle < 0 : 
             relAngle += 2*math.pi # angle now runs counterclockwise starting east
 
         return relAngle
-    
+
+    ##combined function
+
+    def moveToNearestPixie(self, world):
+        ""
+        nearestPixie = self.getNearestPixie(world)
+        self.walkTowards(world, nearestPixie)    
 
 class stone(object):
     ""
@@ -337,21 +343,23 @@ simulatorSteps = 3
 numberOfGenes = 3
 defaultEnergy = 10
 energyDeficitPerMove = 1
+defaultSearchRadius = 5
 
 #initiate world
 grid0 = world(size)
 # manual instancing
-#myPixie1 = pixie(worldToInhabit=grid0, name="Pixie 1", yxPos=(3,1))
+myPixie1 = pixie(worldToInhabit=grid0, name="Pixie 1", yxPos=(3,1))
+myPixie2 = pixie(worldToInhabit=grid0, name="Pixie 2", yxPos=(5,1))
 #myStone1 = stone(grid0, "Stone_1", (2,2))
 #myFlower1 = food(grid0, "Flower_1", (3,3))
-#grid0.updateWorld()
-#render.render(grid0)
-
+grid0.updateWorld()
+render.render(grid0)
+myPixie1.moveToNearestPixie(grid0)
 #myPixie1.move(grid0, (1,1))
 #print(myPixie1.energy)
 
 #automatic instancing
-spawnPixies(3, grid0)
+#spawnPixies(3, grid0)
 
 ## running the simulation
 #print(grid0.inhabitants[0].yxPos)
@@ -359,14 +367,14 @@ render.render(grid0)
 #print(grid0.inhabitants[0].energy)
 
 #for i in range(0, numberOfGenerations):
-for a in range (0, simulatorSteps):
+#for a in range (0, simulatorSteps):
     #grid0.inhabitants[0].move(grid0, (1,0))
     #print(grid0.inhabitants[0].energy)
     #render.render(grid0)
     #print(grid0.inhabitants[0].yxPos)
-    for instance in grid0.inhabitants:
-        instance.executeGenome()
-    render.render(grid0)
+    #for instance in grid0.inhabitants:
+    #    instance.executeGenome()
+    #render.render(grid0)
 
 render.create_gif()
 #print("cwd: ", os.getcwd())
