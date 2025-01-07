@@ -3,7 +3,7 @@ import math
 import numpy as np
 import Biosim_oop1224_render as render
 import os
-"penis"
+
 
 class world():
     """class containing the grid. Multiple grids are possible, but most of the times the
@@ -56,6 +56,7 @@ class object():
         self.worldToInhabit = worldToInhabit
         self.yxPos = yxPos # Tupel, (y, x)
         self.name = name
+        self.objectType = None
     
     def __str__(self):
         
@@ -73,13 +74,13 @@ class pixie(object):
 
     listOfFunctions = []
 
-    def __init__(self, worldToInhabit, name, yxPos, color="FF0000", genome=None):
+    def __init__(self, worldToInhabit, name, yxPos, color="FF0000"):
         ""
         super().__init__(worldToInhabit, name, yxPos)
         #   List of all functions for idividual genes to choose from
         self.energy = defaultEnergy
         self.color = color
-        self.genome = genome
+        self.genome = None
         self.shape = "round"
 
         pixie.listOfFunctions = [
@@ -107,14 +108,14 @@ class pixie(object):
         "walk towards the referenced object"
 
         targetVector = self.getRelativeVector(otherObject)
-        targetDirection = self.getDirection(targetVector)
+        targetDirection = self.getDirection(vector=targetVector)
 
         self.move(world, targetDirection)
 
     
     def move(self, world, vector):
-        """, but only if the new value is in bounds and the
-        neighbouring cell is empty"""
+        """move to a neighbouring field by adding a vector tuple to the current coordinates,
+        but only if the new value is in bounds and the neighbouring cell is empty"""
 
         if self.yxPos[1]+vector[1] < 0 or self.yxPos[1]+vector[1] > np.size(world.grid, 0)-1:
             return
@@ -130,39 +131,7 @@ class pixie(object):
                 print(f"{self.name} moved by {vector}")
 
     ## scanning neighbourhood
-
-    def getDirection(self, object=None, vector=None):
-        """return the direction of a referenced object OR vector as a vector tuple by checking 
-        if the calculated angle is within 22.5° of any cardinal direction"""
-
-        if not vector and not object:
-            raise ValueError("neither an object or vector was provided")
-        
-        if vector:
-            angle = self.getRelativeAngle(relVector=vector)
-        elif object:
-            angle = self.getRelativeAngle(otherObject=object)
-
-        if abs(0 - angle) < (1/8) * math.pi or abs(2*math.pi - angle) < (1/8) * math.pi: # 0° and 360°
-            direction = (0,1)
-        elif abs(0.25*math.pi - angle) < (1/8) * math.pi: # 45°
-            direction = (1,1)
-        elif abs(0.5*math.pi - angle) < (1/8) * math.pi: # 90°
-            direction = (1,0)
-        elif abs(0.75*math.pi - angle) < (1/8) * math.pi: # 120°
-            direction = (1,-1)
-        elif abs(math.pi - angle) < (1/8) * math.pi: # 180°
-            direction = (0,-1)
-        elif abs(1.25*math.pi - angle) < (1/8) * math.pi: # 225°
-            direction = (-1,-1)
-        elif abs(1.5*math.pi - angle) < (1/8) * math.pi: # 270°
-            direction = (-1,0)
-        elif abs(1.75*math.pi - angle) < (1/8) * math.pi: # 315°
-            direction = (-1,1)
-
-        return direction
-
-
+    
     def searchNeighbourhood(self, world, searchRadius):
         "scans the surrounding grid and returns a list of all objects within the search radius"
 
@@ -241,6 +210,8 @@ class pixie(object):
 
         return dy, dx
     
+    ## return values based on a provided object or vector
+
     def getRelativeAngle(self, world, searchRadius, otherObject):
         """returns the angle of the referenced object in relation to self, angles
         are expressed as radiant with range (-pi/pi), going clockwise from the right"""
@@ -251,6 +222,37 @@ class pixie(object):
             relAngle += 2*math.pi # angle now runs counterclockwise starting east
 
         return relAngle
+    
+    def getDirection(self, object=None, vector=None):
+        """return the direction of a referenced object OR vector as a vector tuple by checking 
+        if the calculated angle is within 22.5° of any cardinal direction"""
+
+        if not vector and not object:
+            raise ValueError("neither an object or vector was provided")
+        
+        if vector:
+            angle = self.getRelativeAngle(relVector=vector)
+        elif object:
+            angle = self.getRelativeAngle(otherObject=object)
+
+        if abs(0 - angle) < (1/8) * math.pi or abs(2*math.pi - angle) < (1/8) * math.pi: # 0° and 360°
+            direction = (0,1)
+        elif abs(0.25*math.pi - angle) < (1/8) * math.pi: # 45°
+            direction = (1,1)
+        elif abs(0.5*math.pi - angle) < (1/8) * math.pi: # 90°
+            direction = (1,0)
+        elif abs(0.75*math.pi - angle) < (1/8) * math.pi: # 120°
+            direction = (1,-1)
+        elif abs(math.pi - angle) < (1/8) * math.pi: # 180°
+            direction = (0,-1)
+        elif abs(1.25*math.pi - angle) < (1/8) * math.pi: # 225°
+            direction = (-1,-1)
+        elif abs(1.5*math.pi - angle) < (1/8) * math.pi: # 270°
+            direction = (-1,0)
+        elif abs(1.75*math.pi - angle) < (1/8) * math.pi: # 315°
+            direction = (-1,1)
+
+        return direction
     
 
 class stone(object):
@@ -320,7 +322,10 @@ def spawnPixies(numberOfPixies, worldToSpawnIn):
     #for i in range(numberOfPixies):
         newPixieName = "Pixie_" + str(random.randint(0,1000))
         #wir lassen das checkexist erstmal weg, vielleicht braucht es das gar nicht mehr
-        #Doppelungen können aber gefährlich werden: Check oder nicht random Namen?
+            #Doppelungen können aber gefährlich werden: Check oder nicht random Namen?
+                #mit dem alten System waren die gefährlich weil wir sie nach Namen gereferencet haben
+                #hier wird aber eigentlich immer das Objekt direkt mit object id angesprochen, das ist
+                #praktischer und sicherer. Dann ist der Name auch wurscht und nur für uns zur Ansicht
         newYXPos = (random.randint(0, np.size(worldToSpawnIn.grid, 0)-1), random.randint(0, np.size(worldToSpawnIn.grid, 0)-1))
         if worldToSpawnIn.grid[newYXPos]: # check if cell is already inhabited
             continue
