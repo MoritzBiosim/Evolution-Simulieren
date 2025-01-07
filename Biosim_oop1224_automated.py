@@ -3,7 +3,7 @@ import math
 import numpy as np
 import Biosim_oop1224_render as render
 import os
-
+"penis"
 
 class world():
     """class containing the grid. Multiple grids are possible, but most of the times the
