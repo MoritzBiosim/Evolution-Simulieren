@@ -1,3 +1,6 @@
+
+### THIS IS THE PREDATOR PREY APPROACH ###
+
 import random
 import math
 import numpy as np
