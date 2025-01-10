@@ -308,16 +308,7 @@ class gene():
     0 by default, can mutate."""
     
     def __init__(self):
-        ""
-        self.functionality = random.choice(pixie.listOfFunctions)
-        self.expressionProbability = 1.0    
-
-    def executeFunctionality(self):
-        "executing the function encoded in the gene with the specific expressionProbaility"
-        if random.random() <= self.expressionProbability:
-            self.functionality()
-        else:
-            return
+        ""    
 
 def spawnPixies(numberOfPixies, worldToSpawnIn):
     """spawn new pixies onto the grid by randomly generating a name, coordinates, color and genome.
