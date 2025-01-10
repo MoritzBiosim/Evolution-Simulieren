@@ -124,19 +124,48 @@ class pixie(object):
     def move(self, world, vector):
         """, but only if the new value is in bounds and the
         neighbouring cell is empty"""
-
-        if self.yxPos[1]+vector[1] < 0 or self.yxPos[1]+vector[1] > np.size(world.grid, 0)-1:
-            return
-        if self.yxPos[0]+vector[0] < 0 or self.yxPos[0]+vector[0] > np.size(world.grid, 0)-1:
-            return
-        else:
-            if world.grid[self.yxPos[0]+vector[0]][self.yxPos[1]+vector[1]]:
+        if self.energy != 0:
+            if self.yxPos[1]+vector[1] < 0 or self.yxPos[1]+vector[1] > np.size(world.grid, 0)-1:
+                return
+            if self.yxPos[0]+vector[0] < 0 or self.yxPos[0]+vector[0] > np.size(world.grid, 0)-1:
                 return
             else:
-                self.yxPos = (self.yxPos[0]+vector[0], self.yxPos[1]+vector[1])
-                world.updateWorld()
-                self.energy -= energyDeficitPerMove
-                print(f"{self.name} moved by {vector}")
+                if world.grid[self.yxPos[0]+vector[0]][self.yxPos[1]+vector[1]]:
+                    return
+                else:
+                    self.yxPos = (self.yxPos[0]+vector[0], self.yxPos[1]+vector[1])
+                    world.updateWorld()
+                    self.energy -= energyDeficitPerMove
+                    if self.energy < 0:
+                        self.energy = 0
+                    print(f"{self.name} moved by {vector}")
+        else:
+            print(f"{self.name} has no energy left")
+            return
+        
+    def moveRandom(self, world):
+        """move in a random direction but only if the new value is in bounds and the
+        neighbouring cell is empty"""
+        randomVector = (random.randint(-1,1), random.randint(-1,1))
+
+        if self.energy != 0:
+            if self.yxPos[1]+randomVector[1] < 0 or self.yxPos[1]+randomVector[1] > np.size(world.grid, 0)-1:
+                return
+            if self.yxPos[0]+randomVector[0] < 0 or self.yxPos[0]+randomVector[0] > np.size(world.grid, 0)-1:
+                return
+            else:
+                if world.grid[self.yxPos[0]+randomVector[0]][self.yxPos[1]+randomVector[1]]:
+                    return
+                else:
+                    self.yxPos = (self.yxPos[0]+randomVector[0], self.yxPos[1]+randomVector[1])
+                    world.updateWorld()
+                    self.energy -= energyDeficitPerMove
+                    if self.energy < 0:
+                        self.energy = 0
+                    print(f"{self.name} moved by {randomVector}")
+        else:
+            print(f"{self.name} has no energy left")
+            return
 
     ## scanning neighbourhood
 
@@ -294,25 +323,53 @@ class predator(pixie):
         #different shape or color??
         worldToInhabit.predators.append(self)
 
-    def eatPixie(self, world, preyObject):
+    def getNearestPrey(self, world):
+        "scans the surrounding grid and returns the nearest prey object"
+
+        neighbourhood = self.getAllEuclidianDistances(world)
+        #print(neighbourhood)
+        preyObjects = []
+        
+        for i in neighbourhood:
+            if i[0] in world.prey:
+                preyObjects.append(i)
+
+        if preyObjects:
+            nearest = min(preyObjects, key=lambda x: x[1])
+            return nearest[0]
+        else:
+            print("no prey within search radius")
+            return None
+
+    def eatPrey(self, world, prey):
         "Make a pixie disappear from the grid and increase energy by the prey's energy."
-        prey = getNearestPixie(world)
-        energyToBeGained = prey.getEnergy()
+        energyToBeGained = prey.getEnergy() + defaultEnergyToGainbyEatingPrey
         self.energy += energyToBeGained
-        world.grid[prey.yxPos] = None 
+        world.grid[prey.yxPos] = None
+        print(f"{self.name} ate {prey.name}")
+        print(f"previous energy: {self.energy - energyToBeGained}, new energy: {self.energy}")
 
     def predate(self, world):
         ""
-        nearestPixies = searchNeighbourhood(world)
-        for i in nearestPixies:
-        if isinstance(nearestPixies[i],prey) == True:
-            moveToNearestPixie(world)
-            eatPixie(world)
+        prey = self.getNearestPrey(world)
+        if prey:
+            self.walkTowards(world, prey)
+            distanceToPrey = self.getEuclidianDistance(world, prey)
+            if distanceToPrey == 1:
+                self.eatPrey(world)
+            else:
+                #print("prey to far away to be eaten")
+                pass
         else:
-            pass
+            #print("no prey found")
+            self.moveRandom(world)
 
 class prey(pixie):
     ""
+    def __init__(self, worldToInhabit, name, yxPos, color="FF0000", genome=None):
+        super().__init__(worldToInhabit, name, yxPos, color, genome)
+        
+        worldToInhabit.prey.append(self)
 
 class genome():
     """class containing all existing genomes. 
@@ -372,6 +429,7 @@ numberOfGenes = 3
 defaultEnergy = 10
 energyDeficitPerMove = 1
 defaultSearchRadius = 5
+defaultEnergyToGainbyEatingPrey = 3
 
 #initiate world
 grid0 = world(size)
