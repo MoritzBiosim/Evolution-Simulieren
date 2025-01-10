@@ -94,6 +94,10 @@ class pixie(object):
         self.createGenome()
         worldToInhabit.inhabitants.append(self)
     
+    def getEnergy(self):
+        ""
+        return self.energy
+
     def getGenome(self):
         ""
         return self.genome
@@ -290,14 +294,25 @@ class predator(pixie):
         #different shape or color??
         worldToInhabit.predators.append(self)
 
-    def eatPixie(self, world):
-        "Make a pixie disappear from the grid and increase energy"
+    def eatPixie(self, world, preyObject):
+        "Make a pixie disappear from the grid and increase energy by the prey's energy."
+        prey = getNearestPixie(world)
+        energyToBeGained = prey.getEnergy()
+        self.energy += energyToBeGained
+        world.grid[prey.yxPos] = None 
 
     def predate(self, world):
         ""
-        moveToNearestPixie(world)
-        eatPixie(world)
+        nearestPixies = searchNeighbourhood(world)
+        for i in nearestPixies:
+        if isinstance(nearestPixies[i],prey) == True:
+            moveToNearestPixie(world)
+            eatPixie(world)
+        else:
+            pass
 
+class prey(pixie):
+    ""
 
 class genome():
     """class containing all existing genomes. 
