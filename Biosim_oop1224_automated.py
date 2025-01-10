@@ -18,6 +18,8 @@ class world():
         self.grid = np.empty((size,size), dtype=object)
         self.inhabitants = []
         self.environment = []
+        self.predators = []
+        self.prey = []
     
     def __str__(self):
         return str(self.grid)
@@ -279,6 +281,23 @@ class food(object):
         self.shape = shape
         self.color = "FFFF00" # yellow
         worldToInhabit.environment.append(self)
+
+class predator(pixie):
+    "This class contains pixies who predate other pixies."
+
+    def __init__(self, worldToInhabit, name, yxPos, color="FF0000", genome=None):
+        super().__init__(worldToInhabit, name, yxPos, color, genome)
+        #different shape or color??
+        worldToInhabit.predators.append(self)
+
+    def eatPixie(self, world):
+        "Make a pixie disappear from the grid and increase energy"
+
+    def predate(self, world):
+        ""
+        moveToNearestPixie(world)
+        eatPixie(world)
+
 
 class genome():
     """class containing all existing genomes. 
