@@ -17,12 +17,13 @@ class world():
     # creating a unique gif-file name in the rendering module
 
     # Maybe always having to reference the 'world' in most of the functions is obsolete if 'self' is
-    # already mentioned: self.world could be used to automatically get the inhabited world of the object
+    # already mentioned: self.worldToInhabit could be used to automatically get the inhabited world of the object
     # that is calling the function. This would ease things up when calling functions like moveRandom in
     # the main code block (for example "## running the simulation")
 
-    def __init__(self, size=10):
+    def __init__(self, size=10, name=None):
         self.size = size
+        self.name = name
         self.grid = np.empty((size,size), dtype=object)
         self.inhabitants = []
         self.environment = []
@@ -120,18 +121,19 @@ class pixie(object):
 
     ## moving around
 
-    def walkTowards(self, world, otherObject):
+    def walkTowards(self, otherObject):
         "walk towards the referenced object"
 
         targetVector = self.getRelativeVector(world, otherObject=otherObject)
         targetDirection = self.getDirection(vector=targetVector) #(hier unnötig??)
 
-        self.move(world, targetDirection)
+        self.move(targetDirection)
 
     
-    def move(self, world, vector):
+    def move(self, vector):
         "move along a provided vector, but only if the new box is in bounds and empty"
         
+        world = self.worldToInhabit # this makes providing the argument "world" obsolete
         if self.energy != 0:
             if self.yxPos[1]+vector[1] < 0 or self.yxPos[1]+vector[1] > np.size(world.grid, 0)-1:
                 return
@@ -152,9 +154,10 @@ class pixie(object):
             print(f"{self.name} has no energy left")
             return
         
-    def moveRandom(self, world):
+    def moveRandom(self):
         """move in a random direction but only if the new value is in bounds and the
         neighbouring cell is empty"""
+        world = self.worldToInhabit # this makes providing the argument "world" obsolete
         randomVector = (random.randint(-1,1), random.randint(-1,1))
 
         if self.energy != 0:
@@ -361,13 +364,14 @@ class predator(pixie):
         print(f"{self.name} ate {prey.name}")
         print(f"previous energy: {self.energy - energyToBeGained}, new energy: {self.energy}")
 
-    def predate(self, world):
+    def predate(self):
         "behaviour loop for prey: Search for prey, if none is found move randomly, if some is found"
         "walk towards it. If near enough to prey, consume it"
 
+        world = self.worldToInhabit # this makes providing the argument "world" obsolete
         prey = self.getNearestPrey(world)
         if prey:
-            self.walkTowards(world, prey)
+            self.walkTowards(prey)
             distanceToPrey = self.getEuclidianDistance(world, prey)
             if distanceToPrey < 1.42:
                 self.eatPrey(world, prey)
@@ -376,7 +380,7 @@ class predator(pixie):
                 pass
         else:
             #print("no prey found")
-            self.moveRandom(world)
+            self.moveRandom()
 
 class prey(pixie):
     ""
@@ -437,6 +441,10 @@ def spawnRandomPixies(numberOfPixies, worldToSpawnIn):
 
 def spawnPixie(worldToSpawnIn, species=None):
     "a function to instance a single pixie, optionally specified as predator or prey"
+    # Later it could be added that a name can optionally be provided as an argument, in which case
+    # the random name generation will be skipped. May be useful when spawning multiple pixies
+    # in a for-loop
+
     if not species:
         "if no specifications are provided, generate a random pixie"
 
@@ -451,6 +459,9 @@ def spawnPixie(worldToSpawnIn, species=None):
         newPixieName = pixie(worldToSpawnIn, newPixieName, newYXPos, newHexColor)
         worldToSpawnIn.updateWorld()
 
+        return newPixieName
+
+
     elif species == "predator":
 
         newPredatorName = "Predator_" + str(random.randint(0,1000))
@@ -461,6 +472,9 @@ def spawnPixie(worldToSpawnIn, species=None):
                 continue
             t += 1
         newPredatorName = predator(worldToSpawnIn, newPredatorName, newYXPos)
+        worldToSpawnIn.updateWorld()
+
+        return newPredatorName
     
     elif species == "prey":
 
@@ -472,30 +486,84 @@ def spawnPixie(worldToSpawnIn, species=None):
                 continue
             t += 1
         newPreyName = prey(worldToSpawnIn, newPreyName, newYXPos)
+        worldToSpawnIn.updateWorld()
+
+        return newPreyName
 
     else:
         raise NameError("argument has to be either 'predator' or 'prey'")
 
+def createWorld(worldName, worldSize=10):
+    "create a world with a unique name"
+    worldName = world(size=worldSize, name=worldName)
+
+    return worldName
 
 
+def simulate():
+    ""
 
+    list_of_predators = []
+    mean_energys = []
+
+    for gen in range(numberOfGenerations):
+
+        worldName = "world_" + str(gen + 1)
+        newWorld = createWorld(worldName=worldName, worldSize=world_size)
+
+        # instantiating pixies
+        for i in range(numPredators):
+            predator = spawnPixie(newWorld, species="predator")
+            list_of_predators.append(predator)
+        for i in range(numPrey):
+            spawnPixie(newWorld, species="prey")
+
+        # going through all simulator steps
+        for t in range(simulatorSteps):
+            for prey_ in newWorld.prey:
+                prey_.moveRandom()
+            for predator_ in newWorld.predators:
+                predator_.predate()
+            if createGIF:
+                render.render(newWorld)
+        
+        if createGIF:
+            render.create_gif(newWorld)
+            render.clear_gif()
+
+        # evaluating mean energy levels of all predators
+        sumOfEnergy = 0
+        for p in list_of_predators:
+            energyLevel = p.getEnergy()
+            sumOfEnergy += energyLevel
+            meanEnergy = sumOfEnergy / len(list_of_predators)
+        mean_energys.append((worldName, meanEnergy))
+
+        print(f"in {worldName} the mean energy level after {simulatorSteps} steps was {meanEnergy}")
+    
+    with open("mean energy levels.txt", "w") as textfile:
+        for i in mean_energys:
+            textfile.write(str(i[0])+"\t"+str(i[1])+"\n")
 
 
 
 ##################
 # Parameters
-size = 10
-numberOfGenerations = 1
+world_size = 10
+numberOfGenerations = 3
+numPredators = 1
+numPrey = 6
 simulatorSteps = 15
 numberOfGenes = 3
 defaultEnergy = 10
 energyDeficitPerMove = 1
 defaultSearchRadius = 5
 defaultEnergyToGainbyEatingPrey = 3
+createGIF = True
 
 # initiate world
 
-grid0 = world(size)
+#grid0 = world(size)
 
 # manual instancing
 
@@ -512,17 +580,20 @@ grid0 = world(size)
 # automatic instancing
 
 #spawnRandomPixies(3, grid0)
-spawnPixie(grid0, "predator")
-spawnPixie(grid0, "prey")
-spawnPixie(grid0, "prey")
-spawnPixie(grid0, "prey")
-spawnPixie(grid0, "prey")
+# spawnPixie(grid0, "predator")
+# spawnPixie(grid0, "prey")
+# spawnPixie(grid0, "prey")
+# spawnPixie(grid0, "prey")
+# spawnPixie(grid0, "prey")
 
 
 ## running the simulation
 
-print(grid0.inhabitants[0].yxPos)
-render.render(grid0)
+simulate()
+
+
+#print(grid0.inhabitants[0].yxPos)
+#render.render(grid0)
 #print(grid0.inhabitants[0].energy)
 
 #for i in range(0, numberOfGenerations):
@@ -535,15 +606,15 @@ render.render(grid0)
     #    instance.executeGenome()
     #render.render(grid0)
 
-for a in range(simulatorSteps):
-    "call up every pixie in the grid and make it behave accordingly"
-    for prey_ in grid0.prey:
-        prey_.moveRandom(grid0)
-    for predator_ in grid0.predators:
-        predator_.predate(grid0)
-    render.render(grid0)
+# for a in range(simulatorSteps):
+#     "call up every pixie in the grid and make it behave accordingly"
+#     for prey_ in grid0.prey:
+#         prey_.moveRandom()
+#     for predator_ in grid0.predators:
+#         predator_.predate()
+#     render.render(grid0)
 
 
-render.create_gif()
+#render.create_gif()
 #print("cwd: ", os.getcwd())
-render.clear_gif()
+#render.clear_gif()

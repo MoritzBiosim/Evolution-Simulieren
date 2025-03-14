@@ -44,8 +44,13 @@ def render(world, circleDiameter=30, spacing=0):
     gif_frames.append(image)
     #image.show()
 
-def create_gif():
-    gif_frames[0].save("BS_oop3.gif", save_all=True, append_images=gif_frames[1:],duration=400, loop=0)
+def create_gif(world=None):
+    if world:
+        filename = str(world.name) + ".gif"
+    else: 
+        filename = "PredatorPrey_oop.gif"
+
+    gif_frames[0].save(filename, save_all=True, append_images=gif_frames[1:],duration=400, loop=0)
 
 def clear_gif():
     "clears the gif_frames list"
