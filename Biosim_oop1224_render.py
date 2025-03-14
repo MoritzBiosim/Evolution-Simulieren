@@ -24,6 +24,8 @@ def render(world, circleDiameter=30, spacing=0):
             if object.color:
                 hex_color = object.color
                 rgb_color = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+            else:
+                rgb_color = (15, 0, 0)
 
             # Berechne die Position des Kreises
             top_left = (object.yxPos[1] * cellSize + spacing // 2, object.yxPos[0] * cellSize + spacing // 2)

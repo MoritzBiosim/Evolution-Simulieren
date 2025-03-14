@@ -13,6 +13,14 @@ class world():
     simulation takes place in only one world ("grid0"). For continuity reasons the world
     always has to be referenced when calling a method for any pixie."""
 
+    # Note for later: A variable world_name should be introduced so that it can be referenced when
+    # creating a unique gif-file name in the rendering module
+
+    # Maybe always having to reference the 'world' in most of the functions is obsolete if 'self' is
+    # already mentioned: self.world could be used to automatically get the inhabited world of the object
+    # that is calling the function. This would ease things up when calling functions like moveRandom in
+    # the main code block (for example "## running the simulation")
+
     def __init__(self, size=10):
         self.size = size
         self.grid = np.empty((size,size), dtype=object)
@@ -83,7 +91,7 @@ class pixie(object):
         super().__init__(worldToInhabit, name, yxPos)
         self.searchRadius = defaultSearchRadius
         self.energy = defaultEnergy
-        self.color = color
+        self.color = color # default: red
         self.genome = genome
         self.shape = "round"
 #   List of all functions for idividual genes to choose from
@@ -115,15 +123,15 @@ class pixie(object):
     def walkTowards(self, world, otherObject):
         "walk towards the referenced object"
 
-        targetVector = self.getRelativeVector(world, otherObject)
-        targetDirection = self.getDirection(targetVector)
+        targetVector = self.getRelativeVector(world, otherObject=otherObject)
+        targetDirection = self.getDirection(vector=targetVector) #(hier unnötig??)
 
         self.move(world, targetDirection)
 
     
     def move(self, world, vector):
-        """, but only if the new value is in bounds and the
-        neighbouring cell is empty"""
+        "move along a provided vector, but only if the new box is in bounds and empty"
+        
         if self.energy != 0:
             if self.yxPos[1]+vector[1] < 0 or self.yxPos[1]+vector[1] > np.size(world.grid, 0)-1:
                 return
@@ -131,9 +139,10 @@ class pixie(object):
                 return
             else:
                 if world.grid[self.yxPos[0]+vector[0]][self.yxPos[1]+vector[1]]:
+                    print("box occupied")
                     return
                 else:
-                    self.yxPos = (self.yxPos[0]+vector[0], self.yxPos[1]+vector[1])
+                    self.yxPos = (self.yxPos[0]+vector[0], self.yxPos[1]+vector[1]) # moving
                     world.updateWorld()
                     self.energy -= energyDeficitPerMove
                     if self.energy < 0:
@@ -177,7 +186,7 @@ class pixie(object):
             raise ValueError("neither an object or vector was provided")
         
         if vector:
-            angle = self.getRelativeAngle(relVector=vector)
+            angle = self.getRelativeAngle(world, relVector=vector)
         elif object:
             angle = self.getRelativeAngle(world, otherObject=object)
 
@@ -232,7 +241,7 @@ class pixie(object):
     def getNearest(self, world):
         "scans the surrounding grid and returns the nearest object"
 
-        neighbourhood = self.getAllEuclidianDistances(world, searchRadius)
+        neighbourhood = self.getAllEuclidianDistances(world)
         #print(neighbourhood)
         
         if neighbourhood:
@@ -279,11 +288,11 @@ class pixie(object):
 
         return dy, dx
     
-    def getRelativeAngle(self, world, otherObject):
+    def getRelativeAngle(self, world, otherObject=None, relVector=None):
         """returns the angle of the referenced object in relation to self, angles
         are expressed as radiant with range (-pi/pi), going clockwise from the right"""
-
-        relVector = self.getRelativeVector(world, otherObject)
+        if not relVector and otherObject:
+            relVector = self.getRelativeVector(world, otherObject)
         relAngle = math.atan2(relVector[0],relVector[1])
         if relAngle < 0 : 
             relAngle += 2*math.pi # angle now runs counterclockwise starting east
@@ -318,9 +327,9 @@ class food(object):
 class predator(pixie):
     "This class contains pixies who predate other pixies."
 
-    def __init__(self, worldToInhabit, name, yxPos, color="FF0000", genome=None):
+    def __init__(self, worldToInhabit, name, yxPos, color="FF00FF", genome=None):
         super().__init__(worldToInhabit, name, yxPos, color, genome)
-        #different shape or color??
+        # default color pink
         worldToInhabit.predators.append(self)
 
     def getNearestPrey(self, world):
@@ -346,17 +355,22 @@ class predator(pixie):
         energyToBeGained = prey.getEnergy() + defaultEnergyToGainbyEatingPrey
         self.energy += energyToBeGained
         world.grid[prey.yxPos] = None
+        world.prey.remove(prey)
+        world.inhabitants.remove(prey)
+        world.updateWorld()
         print(f"{self.name} ate {prey.name}")
         print(f"previous energy: {self.energy - energyToBeGained}, new energy: {self.energy}")
 
     def predate(self, world):
-        ""
+        "behaviour loop for prey: Search for prey, if none is found move randomly, if some is found"
+        "walk towards it. If near enough to prey, consume it"
+
         prey = self.getNearestPrey(world)
         if prey:
             self.walkTowards(world, prey)
             distanceToPrey = self.getEuclidianDistance(world, prey)
-            if distanceToPrey == 1:
-                self.eatPrey(world)
+            if distanceToPrey < 1.42:
+                self.eatPrey(world, prey)
             else:
                 #print("prey to far away to be eaten")
                 pass
@@ -366,9 +380,10 @@ class predator(pixie):
 
 class prey(pixie):
     ""
-    def __init__(self, worldToInhabit, name, yxPos, color="FF0000", genome=None):
+    def __init__(self, worldToInhabit, name, yxPos, color="FFFF00", genome=None):
         super().__init__(worldToInhabit, name, yxPos, color, genome)
-        
+        # defaultcolor yellow
+
         worldToInhabit.prey.append(self)
 
 class genome():
@@ -401,7 +416,7 @@ class gene():
     def __init__(self):
         ""    
 
-def spawnPixies(numberOfPixies, worldToSpawnIn):
+def spawnRandomPixies(numberOfPixies, worldToSpawnIn):
     """spawn new pixies onto the grid by randomly generating a name, coordinates, color and genome.
     The coordinates are checked for already existing objects before spawning and if the desired cell
     is not available, the pixie gets discarded and a new one gets generated"""
@@ -420,35 +435,93 @@ def spawnPixies(numberOfPixies, worldToSpawnIn):
         worldToSpawnIn.updateWorld()
         p += 1
 
+def spawnPixie(worldToSpawnIn, species=None):
+    "a function to instance a single pixie, optionally specified as predator or prey"
+    if not species:
+        "if no specifications are provided, generate a random pixie"
+
+        newPixieName = "Pixie_" + str(random.randint(0,1000))
+        newHexColor = "%06x" % random.randint(0,0xFFFFFF)
+        t = 0
+        while t < 1:
+            newYXPos = (random.randint(0, np.size(worldToSpawnIn.grid, 0)-1), random.randint(0, np.size(worldToSpawnIn.grid, 0)-1))
+            if worldToSpawnIn.grid[newYXPos]: # check if cell is already inhabited
+                continue
+            t += 1
+        newPixieName = pixie(worldToSpawnIn, newPixieName, newYXPos, newHexColor)
+        worldToSpawnIn.updateWorld()
+
+    elif species == "predator":
+
+        newPredatorName = "Predator_" + str(random.randint(0,1000))
+        t = 0
+        while t < 1:
+            newYXPos = (random.randint(0, np.size(worldToSpawnIn.grid, 0)-1), random.randint(0, np.size(worldToSpawnIn.grid, 0)-1))
+            if worldToSpawnIn.grid[newYXPos]: # check if cell is already inhabited
+                continue
+            t += 1
+        newPredatorName = predator(worldToSpawnIn, newPredatorName, newYXPos)
+    
+    elif species == "prey":
+
+        newPreyName = "Prey_" + str(random.randint(0,1000))
+        t = 0
+        while t < 1:
+            newYXPos = (random.randint(0, np.size(worldToSpawnIn.grid, 0)-1), random.randint(0, np.size(worldToSpawnIn.grid, 0)-1))
+            if worldToSpawnIn.grid[newYXPos]: # check if cell is already inhabited
+                continue
+            t += 1
+        newPreyName = prey(worldToSpawnIn, newPreyName, newYXPos)
+
+    else:
+        raise NameError("argument has to be either 'predator' or 'prey'")
+
+
+
+
+
+
+
 ##################
-#Parameters
+# Parameters
 size = 10
 numberOfGenerations = 1
-simulatorSteps = 3
+simulatorSteps = 15
 numberOfGenes = 3
 defaultEnergy = 10
 energyDeficitPerMove = 1
 defaultSearchRadius = 5
 defaultEnergyToGainbyEatingPrey = 3
 
-#initiate world
+# initiate world
+
 grid0 = world(size)
+
 # manual instancing
-myPixie1 = pixie(worldToInhabit=grid0, name="Pixie 1", yxPos=(3,1))
-myPixie2 = pixie(worldToInhabit=grid0, name="Pixie 2", yxPos=(5,1))
+
+#myPixie1 = pixie(worldToInhabit=grid0, name="Pixie 1", yxPos=(3,1))
+#myPixie2 = pixie(worldToInhabit=grid0, name="Pixie 2", yxPos=(5,1))
 #myStone1 = stone(grid0, "Stone_1", (2,2))
 #myFlower1 = food(grid0, "Flower_1", (3,3))
-grid0.updateWorld()
-render.render(grid0)
-myPixie1.moveToNearestPixie(grid0)
+#grid0.updateWorld()
+#render.render(grid0)
+#myPixie1.moveToNearestPixie(grid0)
 #myPixie1.move(grid0, (1,1))
 #print(myPixie1.energy)
 
-#automatic instancing
-#spawnPixies(3, grid0)
+# automatic instancing
+
+#spawnRandomPixies(3, grid0)
+spawnPixie(grid0, "predator")
+spawnPixie(grid0, "prey")
+spawnPixie(grid0, "prey")
+spawnPixie(grid0, "prey")
+spawnPixie(grid0, "prey")
+
 
 ## running the simulation
-#print(grid0.inhabitants[0].yxPos)
+
+print(grid0.inhabitants[0].yxPos)
 render.render(grid0)
 #print(grid0.inhabitants[0].energy)
 
@@ -461,6 +534,15 @@ render.render(grid0)
     #for instance in grid0.inhabitants:
     #    instance.executeGenome()
     #render.render(grid0)
+
+for a in range(simulatorSteps):
+    "call up every pixie in the grid and make it behave accordingly"
+    for prey_ in grid0.prey:
+        prey_.moveRandom(grid0)
+    for predator_ in grid0.predators:
+        predator_.predate(grid0)
+    render.render(grid0)
+
 
 render.create_gif()
 #print("cwd: ", os.getcwd())
