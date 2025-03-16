@@ -5,7 +5,7 @@ import random
 import math
 import numpy as np
 import Biosim_oop1224_render as render
-import os
+import Biosim_data_analysis as data
 
 
 class world():
@@ -141,7 +141,7 @@ class pixie(object):
                 return
             else:
                 if world.grid[self.yxPos[0]+vector[0]][self.yxPos[1]+vector[1]]:
-                    print("box occupied")
+                    # print("box occupied")
                     return
                 else:
                     self.yxPos = (self.yxPos[0]+vector[0], self.yxPos[1]+vector[1]) # moving
@@ -149,9 +149,9 @@ class pixie(object):
                     self.energy -= energyDeficitPerMove
                     if self.energy < 0:
                         self.energy = 0
-                    print(f"{self.name} moved by {vector}")
+                    # print(f"{self.name} moved by {vector}")
         else:
-            print(f"{self.name} has no energy left")
+            # print(f"{self.name} has no energy left")
             return
         
     def moveRandom(self):
@@ -174,9 +174,9 @@ class pixie(object):
                     self.energy -= energyDeficitPerMove
                     if self.energy < 0:
                         self.energy = 0
-                    print(f"{self.name} moved by {randomVector}")
+                    # print(f"{self.name} moved by {randomVector}")
         else:
-            print(f"{self.name} has no energy left")
+            # print(f"{self.name} has no energy left")
             return
 
     ## scanning neighbourhood
@@ -350,19 +350,19 @@ class predator(pixie):
             nearest = min(preyObjects, key=lambda x: x[1])
             return nearest[0]
         else:
-            print("no prey within search radius")
+            # print("no prey within search radius")
             return None
 
     def eatPrey(self, world, prey):
         "Make a pixie disappear from the grid and increase energy by the prey's energy."
         energyToBeGained = prey.getEnergy() + defaultEnergyToGainbyEatingPrey
         self.energy += energyToBeGained
-        world.grid[prey.yxPos] = None
+
         world.prey.remove(prey)
         world.inhabitants.remove(prey)
         world.updateWorld()
-        print(f"{self.name} ate {prey.name}")
-        print(f"previous energy: {self.energy - energyToBeGained}, new energy: {self.energy}")
+        # print(f"{self.name} ate {prey.name}")
+        # print(f"previous energy: {self.energy - energyToBeGained}, new energy: {self.energy}")
 
     def predate(self):
         "behaviour loop for prey: Search for prey, if none is found move randomly, if some is found"
@@ -506,6 +506,11 @@ def simulate():
     list_of_predators = []
     mean_energys = []
 
+    with open("mean energy levels.txt", "w") as textfile:
+        "header"
+
+        textfile.write("world\t"+"predators\t"+"prey\t"+"mean energy pred.\n")
+
     for gen in range(numberOfGenerations):
 
         worldName = "world_" + str(gen + 1)
@@ -537,29 +542,118 @@ def simulate():
             energyLevel = p.getEnergy()
             sumOfEnergy += energyLevel
             meanEnergy = sumOfEnergy / len(list_of_predators)
-        mean_energys.append((worldName, meanEnergy))
+        mean_energys.append((worldName, numPredators, numPrey, meanEnergy))
 
         print(f"in {worldName} the mean energy level after {simulatorSteps} steps was {meanEnergy}")
     
-    with open("mean energy levels.txt", "w") as textfile:
+    with open("mean energy levels.txt", "a") as textfile:
         for i in mean_energys:
-            textfile.write(str(i[0])+"\t"+str(i[1])+"\n")
+            textfile.write(str(i[0])+"\t"+str(i[1])+"\t"+str(i[2])+"\t"+str(i[3])+"\n")
 
 
+def simulateCustom(generation, numPredators_, numPrey_):
+    "only one step, with specified"
+
+    list_of_predators = []
+    mean_energys = []
+
+    worldName = "world_" + str(generation + 1)
+    newWorld = createWorld(worldName=worldName, worldSize=world_size)
+
+    # instantiating pixies
+    for i in range(numPredators_):
+        predator = spawnPixie(newWorld, species="predator")
+        list_of_predators.append(predator)
+    for i in range(numPrey_):
+        spawnPixie(newWorld, species="prey")
+
+    # going through all simulator steps
+    for t in range(simulatorSteps):
+        for prey_ in newWorld.prey:
+            prey_.moveRandom()
+        for predator_ in newWorld.predators:
+            predator_.predate()
+        if createGIF:
+            render.render(newWorld)
+    
+    if createGIF:
+        render.create_gif(newWorld)
+        render.clear_gif()
+
+    # evaluating mean energy levels of all predators
+    sumOfEnergy = 0
+    for p in list_of_predators:
+        energyLevel = p.getEnergy()
+        sumOfEnergy += energyLevel
+        meanEnergy = sumOfEnergy / len(list_of_predators)
+    mean_energys.append((worldName, numPredators_, numPrey_, meanEnergy))
+
+    print(f"in {worldName} the mean energy level after {simulatorSteps} steps was {meanEnergy}")
+    
+    with open("mean energy levels.txt", "a") as textfile:
+        for i in mean_energys:
+            textfile.write(str(i[0])+"\t"+str(i[1])+"\t"+str(i[2])+"\t"+str(i[3])+"\n")
+
+
+def simulateRandom():
+    list_of_predators = []
+    mean_energys = []
+
+    for gen in range(numberOfGenerations):
+
+        worldName = "world_" + str(gen + 1)
+        newWorld = createWorld(worldName=worldName, worldSize=world_size)
+
+        numPredators_ = random.randint(1, numPredators)
+        numPrey_ = random.randint(1, numPrey)
+
+        # instantiating pixies
+        for i in range(numPredators_):
+            predator = spawnPixie(newWorld, species="predator")
+            list_of_predators.append(predator)
+        for i in range(numPrey_):
+            spawnPixie(newWorld, species="prey")
+
+        # going through all simulator steps
+        for t in range(simulatorSteps):
+            for prey_ in newWorld.prey:
+                prey_.moveRandom()
+            for predator_ in newWorld.predators:
+                predator_.predate()
+            if createGIF:
+                render.render(newWorld)
+        
+        if createGIF:
+            render.create_gif(newWorld)
+            render.clear_gif()
+
+        # evaluating mean energy levels of all predators
+        sumOfEnergy = 0
+        for p in list_of_predators:
+            energyLevel = p.getEnergy()
+            sumOfEnergy += energyLevel
+            meanEnergy = sumOfEnergy / len(list_of_predators)
+        mean_energys.append((worldName, numPredators_, numPrey_, meanEnergy))
+
+        print(f"in {worldName} the mean energy level after {simulatorSteps} steps was {meanEnergy}")
+    
+    with open("energylevels_database.txt", "a") as textfile:
+        for i in mean_energys:
+            textfile.write(str(i[0])+"\t"+str(i[1])+"\t"+str(i[2])+"\t"+str(i[3])+"\n")
 
 ##################
 # Parameters
-world_size = 10
-numberOfGenerations = 3
+world_size = 15
+numberOfGenerations = 10
 numPredators = 1
-numPrey = 6
-simulatorSteps = 15
+numPrey = 200
+simulatorSteps = 7
 numberOfGenes = 3
 defaultEnergy = 10
 energyDeficitPerMove = 1
 defaultSearchRadius = 5
 defaultEnergyToGainbyEatingPrey = 3
-createGIF = True
+createGIF = False
 
 # initiate world
 
@@ -589,30 +683,22 @@ createGIF = True
 
 ## running the simulation
 
-simulate()
+#simulate()
+
+# with open("mean energy levels.txt", "w") as textfile:
+#     "header"
+
+#     textfile.write("world\t"+"predators\t"+"prey\t"+"mean energy pred.\n")
+
+# for i in range(numberOfGenerations):
+#     simulateCustom(generation=i, numPrey_=i, numPredators_=numPredators)
+
+for i in range(300):
+    simulateRandom()
+data.data_analysis()
 
 
-#print(grid0.inhabitants[0].yxPos)
-#render.render(grid0)
-#print(grid0.inhabitants[0].energy)
 
-#for i in range(0, numberOfGenerations):
-#for a in range (0, simulatorSteps):
-    #grid0.inhabitants[0].move(grid0, (1,0))
-    #print(grid0.inhabitants[0].energy)
-    #render.render(grid0)
-    #print(grid0.inhabitants[0].yxPos)
-    #for instance in grid0.inhabitants:
-    #    instance.executeGenome()
-    #render.render(grid0)
-
-# for a in range(simulatorSteps):
-#     "call up every pixie in the grid and make it behave accordingly"
-#     for prey_ in grid0.prey:
-#         prey_.moveRandom()
-#     for predator_ in grid0.predators:
-#         predator_.predate()
-#     render.render(grid0)
 
 
 #render.create_gif()
