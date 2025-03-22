@@ -645,9 +645,9 @@ def simulateRandom():
 # Parameters
 world_size = 15
 numberOfGenerations = 10
-numPredators = 1
+numPredators = 20
 numPrey = 200
-simulatorSteps = 7
+simulatorSteps = 10
 numberOfGenes = 3
 defaultEnergy = 10
 energyDeficitPerMove = 1
@@ -693,14 +693,6 @@ createGIF = False
 # for i in range(numberOfGenerations):
 #     simulateCustom(generation=i, numPrey_=i, numPredators_=numPredators)
 
-for i in range(300):
+for i in range(300   ):
     simulateRandom()
-data.data_analysis()
-
-
-
-
-
-#render.create_gif()
-#print("cwd: ", os.getcwd())
-#render.clear_gif()
+data.data_analysis3d()
