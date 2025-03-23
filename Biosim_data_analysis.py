@@ -54,4 +54,28 @@ def data_analysis3d():
     # plt.ylabel("mean energy value [a.u.]")
     plt.show()
 
-data_analysis3d()
+def optimality_graph(maxThickness, simSteps):
+    energylevels = pd.read_csv("optimality.txt", sep="\t")
+    bins = []
+    labels = []
+
+    bins_steps = range(0, maxThickness+1, 4)
+    for i in bins_steps:
+        bins.append(i)
+        if i>0:
+            labels.append(str(i))
+
+    energylevels["sorted thickness"] = pd.cut(energylevels["preferred thickness"], bins=bins, labels=labels)
+    output = energylevels.groupby("sorted thickness")["Energy"].mean().reset_index()
+
+
+    plt.plot(output["sorted thickness"], output["Energy"], label="energy values")
+
+    plt.title("mean energy levels by preferred prey thickness")
+    plt.xlabel("preferred thickness")
+    plt.ylabel(f"energy after {simSteps} sim steps")
+    plt.legend()
+
+    plt.show()
+
+#optimality_graph()

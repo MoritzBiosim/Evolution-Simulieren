@@ -134,50 +134,28 @@ class pixie(object):
         "move along a provided vector, but only if the new box is in bounds and empty"
         
         world = self.worldToInhabit # this makes providing the argument "world" obsolete
-        if self.energy != 0:
-            if self.yxPos[1]+vector[1] < 0 or self.yxPos[1]+vector[1] > np.size(world.grid, 0)-1:
-                return
-            if self.yxPos[0]+vector[0] < 0 or self.yxPos[0]+vector[0] > np.size(world.grid, 0)-1:
-                return
-            else:
-                if world.grid[self.yxPos[0]+vector[0]][self.yxPos[1]+vector[1]]:
-                    # print("box occupied")
-                    return
-                else:
-                    self.yxPos = (self.yxPos[0]+vector[0], self.yxPos[1]+vector[1]) # moving
-                    world.updateWorld()
-                    self.energy -= energyDeficitPerMove
-                    if self.energy < 0:
-                        self.energy = 0
-                    # print(f"{self.name} moved by {vector}")
-        else:
-            # print(f"{self.name} has no energy left")
+
+        if self.yxPos[1]+vector[1] < 0 or self.yxPos[1]+vector[1] > np.size(world.grid, 0)-1:
             return
-        
+        if self.yxPos[0]+vector[0] < 0 or self.yxPos[0]+vector[0] > np.size(world.grid, 0)-1:
+            return
+        else:
+            self.yxPos = (self.yxPos[0]+vector[0], self.yxPos[1]+vector[1]) # moving
+            world.updateWorld()
+            #self.energy -= energyDeficitPerMove  #DAS HIER IST AUSGESCHALTET
+            if self.energy < 0:
+                self.energy = 0
+            # print(f"{self.name} moved by {vector}")
+
+
     def moveRandom(self):
         """move in a random direction but only if the new value is in bounds and the
         neighbouring cell is empty"""
         world = self.worldToInhabit # this makes providing the argument "world" obsolete
         randomVector = (random.randint(-1,1), random.randint(-1,1))
 
-        if self.energy != 0:
-            if self.yxPos[1]+randomVector[1] < 0 or self.yxPos[1]+randomVector[1] > np.size(world.grid, 0)-1:
-                return
-            if self.yxPos[0]+randomVector[0] < 0 or self.yxPos[0]+randomVector[0] > np.size(world.grid, 0)-1:
-                return
-            else:
-                if world.grid[self.yxPos[0]+randomVector[0]][self.yxPos[1]+randomVector[1]]:
-                    return
-                else:
-                    self.yxPos = (self.yxPos[0]+randomVector[0], self.yxPos[1]+randomVector[1])
-                    world.updateWorld()
-                    self.energy -= energyDeficitPerMove
-                    if self.energy < 0:
-                        self.energy = 0
-                    # print(f"{self.name} moved by {randomVector}")
-        else:
-            # print(f"{self.name} has no energy left")
-            return
+        self.move(randomVector)
+        
 
     ## scanning neighbourhood
 
@@ -330,8 +308,10 @@ class food(object):
 class predator(pixie):
     "This class contains pixies who predate other pixies."
 
-    def __init__(self, worldToInhabit, name, yxPos, color="FF00FF", genome=None):
+    def __init__(self, worldToInhabit, name, yxPos, preferredThickness, color="FF00FF", waiting=0, genome=None):
         super().__init__(worldToInhabit, name, yxPos, color, genome)
+        self.preferredThickness = preferredThickness
+        self.waiting = waiting
         # default color pink
         worldToInhabit.predators.append(self)
 
@@ -344,7 +324,9 @@ class predator(pixie):
         
         for i in neighbourhood:
             if i[0] in world.prey:
-                preyObjects.append(i)
+                if i[0].getThickness() > self.preferredThickness[0] and i[0].getThickness() < self.preferredThickness[1]:
+                    "only prey within the preferred thickness range get added to the list"
+                    preyObjects.append(i)
 
         if preyObjects:
             nearest = min(preyObjects, key=lambda x: x[1])
@@ -354,9 +336,13 @@ class predator(pixie):
             return None
 
     def eatPrey(self, world, prey):
-        "Make a pixie disappear from the grid and increase energy by the prey's energy."
-        energyToBeGained = prey.getEnergy() + defaultEnergyToGainbyEatingPrey
+        "Make a pixie disappear from the grid and increase energy by the prey's thickness, then wait."
+        # energyToBeGained = prey.getEnergy() + defaultEnergyToGainbyEatingPrey
+        energyToBeGained = getEnergyGainage(prey.getThickness())
         self.energy += energyToBeGained
+
+        waitingTime = getHandlingTime(prey.getThickness()) 
+        self.waiting += waitingTime
 
         world.prey.remove(prey)
         world.inhabitants.remove(prey)
@@ -370,6 +356,7 @@ class predator(pixie):
 
         world = self.worldToInhabit # this makes providing the argument "world" obsolete
         prey = self.getNearestPrey(world)
+
         if prey:
             self.walkTowards(prey)
             distanceToPrey = self.getEuclidianDistance(world, prey)
@@ -384,11 +371,16 @@ class predator(pixie):
 
 class prey(pixie):
     ""
-    def __init__(self, worldToInhabit, name, yxPos, color="FFFF00", genome=None):
+    def __init__(self, worldToInhabit, name, yxPos, thickness, color="FFFF00", genome=None):
         super().__init__(worldToInhabit, name, yxPos, color, genome)
+        self.thickness = thickness
         # defaultcolor yellow
 
         worldToInhabit.prey.append(self)
+
+    def getThickness(self):
+
+        return self.thickness
 
 class genome():
     """class containing all existing genomes. 
@@ -471,7 +463,10 @@ def spawnPixie(worldToSpawnIn, species=None):
             if worldToSpawnIn.grid[newYXPos]: # check if cell is already inhabited
                 continue
             t += 1
-        newPredatorName = predator(worldToSpawnIn, newPredatorName, newYXPos)
+        newPreferredThickness0 = random.random() * (maxThickness-4)           # 0 bis 16
+        newPreferredThickness1 = newPreferredThickness0 + 4     # 4 bis 20
+        newPreferredThickness = (newPreferredThickness0, newPreferredThickness1)
+        newPredatorName = predator(worldToSpawnIn, newPredatorName, newYXPos, preferredThickness=newPreferredThickness)
         worldToSpawnIn.updateWorld()
 
         return newPredatorName
@@ -485,7 +480,10 @@ def spawnPixie(worldToSpawnIn, species=None):
             if worldToSpawnIn.grid[newYXPos]: # check if cell is already inhabited
                 continue
             t += 1
-        newPreyName = prey(worldToSpawnIn, newPreyName, newYXPos)
+        # generating new thickness: More low thickness prey shall be generated
+        x = random.random()
+        newThickness = x**2 * maxThickness # werte von 0 bis maXThickness
+        newPreyName = prey(worldToSpawnIn, newPreyName, newYXPos, thickness=newThickness, color=getPreyColor(newThickness))
         worldToSpawnIn.updateWorld()
 
         return newPreyName
@@ -499,9 +497,35 @@ def createWorld(worldName, worldSize=10):
 
     return worldName
 
+def getHandlingTime(thickness):
+    "the handling time depends on the thickness of the prey multiplied by a factor"
+
+    # return 0.015 * thickness**2 + 10
+    return 1 * thickness
+
+def getEnergyGainage(thickness):
+    "the energy gainage depends on the thickness of the prey multplied by a factor and increased by a constant"
+
+    return 1 * thickness
+
+def getPreyColor(value): # grüße gehen raus an ChatGPT
+
+    # RGB-Werte für Gelb (0, 255, 255) und Blau (0, 0, 255)
+    yellow = np.array([255, 255, 0])
+    blue = np.array([0, 0, 255])
+
+    # Berechne den interpolierten Farbwert
+    ratio = value / maxThickness  # Normalisiere den Wert zwischen 0 und 1
+    color = yellow * (1 - ratio) + blue * ratio  # Lineare Interpolation der RGB-Werte
+
+    # Umwandlung des RGB-Werts in Hex
+    hex_color = '{:02x}{:02x}{:02x}'.format(int(color[0]), int(color[1]), int(color[2]))
+    
+    return hex_color
+
 
 def simulate():
-    ""
+    "simulate worlds according to parameters"
 
     list_of_predators = []
     mean_energys = []
@@ -528,7 +552,10 @@ def simulate():
             for prey_ in newWorld.prey:
                 prey_.moveRandom()
             for predator_ in newWorld.predators:
-                predator_.predate()
+                if predator_.waiting > 0:
+                    predator_.waiting -= 1
+                else:
+                    predator_.predate()
             if createGIF:
                 render.render(newWorld)
         
@@ -551,75 +578,39 @@ def simulate():
             textfile.write(str(i[0])+"\t"+str(i[1])+"\t"+str(i[2])+"\t"+str(i[3])+"\n")
 
 
-def simulateCustom(generation, numPredators_, numPrey_):
-    "only one step, with specified"
+def runOptimalityModel():
+    "simulate multiple worlds with varying 'preferredThickness'-values. Track these and the mean fitness in a textfile"
 
     list_of_predators = []
-    mean_energys = []
+    datapoints = []
 
-    worldName = "world_" + str(generation + 1)
-    newWorld = createWorld(worldName=worldName, worldSize=world_size)
-
-    # instantiating pixies
-    for i in range(numPredators_):
-        predator = spawnPixie(newWorld, species="predator")
-        list_of_predators.append(predator)
-    for i in range(numPrey_):
-        spawnPixie(newWorld, species="prey")
-
-    # going through all simulator steps
-    for t in range(simulatorSteps):
-        for prey_ in newWorld.prey:
-            prey_.moveRandom()
-        for predator_ in newWorld.predators:
-            predator_.predate()
-        if createGIF:
-            render.render(newWorld)
-    
-    if createGIF:
-        render.create_gif(newWorld)
-        render.clear_gif()
-
-    # evaluating mean energy levels of all predators
-    sumOfEnergy = 0
-    for p in list_of_predators:
-        energyLevel = p.getEnergy()
-        sumOfEnergy += energyLevel
-        meanEnergy = sumOfEnergy / len(list_of_predators)
-    mean_energys.append((worldName, numPredators_, numPrey_, meanEnergy))
-
-    print(f"in {worldName} the mean energy level after {simulatorSteps} steps was {meanEnergy}")
-    
-    with open("mean energy levels.txt", "a") as textfile:
-        for i in mean_energys:
-            textfile.write(str(i[0])+"\t"+str(i[1])+"\t"+str(i[2])+"\t"+str(i[3])+"\n")
-
-
-def simulateRandom():
-    list_of_predators = []
-    mean_energys = []
+    # with open("optimality.txt", "w") as textfile:
+    #     "header"
+        
+    #     textfile.write("world\t"+"preferredThickness\t"+"energy\n")
 
     for gen in range(numberOfGenerations):
 
         worldName = "world_" + str(gen + 1)
         newWorld = createWorld(worldName=worldName, worldSize=world_size)
 
-        numPredators_ = random.randint(1, numPredators)
-        numPrey_ = random.randint(1, numPrey)
-
         # instantiating pixies
-        for i in range(numPredators_):
+        for i in range(numPrey):
+            spawnPixie(newWorld, species="prey")
+        for i in range(numPredators):
             predator = spawnPixie(newWorld, species="predator")
             list_of_predators.append(predator)
-        for i in range(numPrey_):
-            spawnPixie(newWorld, species="prey")
 
         # going through all simulator steps
         for t in range(simulatorSteps):
             for prey_ in newWorld.prey:
-                prey_.moveRandom()
+                pass # prey doesn't move
+                # prey_.moveRandom()
             for predator_ in newWorld.predators:
-                predator_.predate()
+                if predator_.waiting > 0:
+                    predator_.waiting -= 1
+                else:
+                    predator_.predate()
             if createGIF:
                 render.render(newWorld)
         
@@ -627,72 +618,41 @@ def simulateRandom():
             render.create_gif(newWorld)
             render.clear_gif()
 
-        # evaluating mean energy levels of all predators
-        sumOfEnergy = 0
+        # evaluating mean energy levels of the predator
+        
         for p in list_of_predators:
-            energyLevel = p.getEnergy()
-            sumOfEnergy += energyLevel
-            meanEnergy = sumOfEnergy / len(list_of_predators)
-        mean_energys.append((worldName, numPredators_, numPrey_, meanEnergy))
+            energy = p.getEnergy()
+            prefT = p.preferredThickness
+            pT_centre = (prefT[0]+prefT[1]) / 2
+        datapoints.append((pT_centre, energy))
 
-        print(f"in {worldName} the mean energy level after {simulatorSteps} steps was {meanEnergy}")
+        print(f"in {worldName} the energy level after {simulatorSteps} steps was {energy}")
     
-    with open("energylevels_database.txt", "a") as textfile:
-        for i in mean_energys:
-            textfile.write(str(i[0])+"\t"+str(i[1])+"\t"+str(i[2])+"\t"+str(i[3])+"\n")
+    with open("optimality.txt", "w") as textfile:
+
+        textfile.write("preferred thickness\t"+"Energy\n")
+        for i in datapoints:
+            textfile.write(str(i[0])+"\t"+str(i[1])+"\n")
 
 ##################
 # Parameters
-world_size = 15
-numberOfGenerations = 10
-numPredators = 20
-numPrey = 200
-simulatorSteps = 10
-numberOfGenes = 3
-defaultEnergy = 10
-energyDeficitPerMove = 1
-defaultSearchRadius = 5
-defaultEnergyToGainbyEatingPrey = 3
+world_size = 50
+numberOfGenerations = 500
+numPredators = 1
+numPrey = 300
+maxThickness = 80
+simulatorSteps = 200
+
+numberOfGenes = 3 # obsolete
+defaultEnergy = 0 # obsolete
+energyDeficitPerMove = 1 # obsolete
+defaultSearchRadius = 20 
+defaultEnergyToGainbyEatingPrey = 3 # obsolete
+
 createGIF = False
-
-# initiate world
-
-#grid0 = world(size)
-
-# manual instancing
-
-#myPixie1 = pixie(worldToInhabit=grid0, name="Pixie 1", yxPos=(3,1))
-#myPixie2 = pixie(worldToInhabit=grid0, name="Pixie 2", yxPos=(5,1))
-#myStone1 = stone(grid0, "Stone_1", (2,2))
-#myFlower1 = food(grid0, "Flower_1", (3,3))
-#grid0.updateWorld()
-#render.render(grid0)
-#myPixie1.moveToNearestPixie(grid0)
-#myPixie1.move(grid0, (1,1))
-#print(myPixie1.energy)
-
-# automatic instancing
-
-#spawnRandomPixies(3, grid0)
-# spawnPixie(grid0, "predator")
-# spawnPixie(grid0, "prey")
-# spawnPixie(grid0, "prey")
-# spawnPixie(grid0, "prey")
-# spawnPixie(grid0, "prey")
-
 
 ## running the simulation
 
-#simulate()
+runOptimalityModel()
+data.optimality_graph(maxThickness, simulatorSteps)
 
-# with open("mean energy levels.txt", "w") as textfile:
-#     "header"
-
-#     textfile.write("world\t"+"predators\t"+"prey\t"+"mean energy pred.\n")
-
-# for i in range(numberOfGenerations):
-#     simulateCustom(generation=i, numPrey_=i, numPredators_=numPredators)
-
-for i in range(300   ):
-    simulateRandom()
-data.data_analysis3d()
