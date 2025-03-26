@@ -105,7 +105,8 @@ class pixie(object):
 
     def executeGenome(self):
         ""
-        self.genome.executeGenes()
+        #self.genome.executeGenes()
+        self.genome.genomeExpressionMainloop()
 
     ## moving around
 
@@ -340,6 +341,19 @@ class genome():
         
         self.loadGenome()
 
+    def __str__(self):
+        for neurolink in self.genes:
+            return neurolink 
+    
+    def getGenes(self):
+        ""
+        return self.genes
+    
+    def printNeurons(self):
+        "return all attributes for each neuron"
+        for n in self.allNeurons:
+            print(n)
+
     def loadGenome(self):
         "sort the neuron objects into the sets and lists above."
 
@@ -366,12 +380,18 @@ class genome():
         self.removeUselessGenes()
 
         # sort Neurolinks by starting point/destination
-        self.sortNeurolinks()
+        self.sortNeurolinks() # OBSOLETE
+
+        # assert corresponding sinks to every source neuron
+        self.assertOwnSinks()
+        for neuron in self.sourceNeurons:
+            print(f"{neuron}: {neuron.ownSinks}")
 
         # last step: evaluate if the genome is functioning or not
         self.checkFunctioningGenome()
 
-    def sortNeurolinks(self):
+
+    def sortNeurolinks(self): # OBSOLETE?
         "sort Neurolinks by starting point / destination"
         for neurolink in self.genes: 
             if neurolink.DNA[0] == "1" and neurolink.DNA[8] == "0": # sensor to internal
@@ -479,6 +499,14 @@ class genome():
 
         #print(f"sources: {self.sources}, sinks: {self.sinks}")
 
+    def assertOwnSinks(self):
+        "sort the corresponding sink objects into the ownSinks-list of the source neuron"
+
+        for neurolink in self.genes:
+            source_neuron = next(obj for obj in self.sourceNeurons if neurolink.source == obj.__class__)
+            sink_neuron = next(obj for obj in self.sinkNeurons if neurolink.sink == obj.__class__)
+            source_neuron.ownSinks.append(sink_neuron)
+
     def checkFunctioningGenome(self):
         "check whether there is any content in the sourceNeurons or sinkNeurons lists"
 
@@ -487,18 +515,7 @@ class genome():
         else: 
             self.functioningGenome = False
 
-    def __str__(self):
-        for neurolink in self.genes:
-            return neurolink 
-    
-    def getGenes(self):
-        ""
-        return self.genes
-    
-    def printNeurons(self):
-        "return all attributes for each neuron"
-        for n in self.allNeurons:
-            print(n)
+# brauchen wir die hier noch
     def executeGenes(self):
         "main loop for each pixie in each simstep"
 
@@ -509,71 +526,167 @@ class genome():
         print("i_i_neurolinks", self.internalToInternal)
         print("si_a_neurolinks", self.sensor_InternalToAction)
         self.printNeurons()
-        # execute all sensor neurons
+
+        # get Inputs from all the sensor Neurons
+        #self.p1executeSensors()
+
+        # transfer first only sensor outputs into internal neurons
+        # self.p2transferS_I()
+
+        # let the Internal Neurons process their inputs
+        # self.p3executeInternals()
+
+        # transfer internal outputs to other internal neurons (or itself)
+        # self.p4transferI_I()
+
+        # pull all outputs into the respective Action Neuron
+        # self.p5transferSI_A()
+
+        # execute the actions
+        # self.p6executeActions()
+
+# fuck this shit, alles hier drunter ist obsolet (vielleicht als backup aufheben, weil es funktioniert zumindest mit 1 internal neuron)
+    def p1executeSensors(self):
+        "execute all sensor neurons"
+
         print("-----------execute round 1 (sensors)")
         for source_neuron in self.sourceNeurons:
             if source_neuron.__class__ in sensor_dict.values():
                 print("sensor neurons getting computed")
                 source_neuron.execute()
         self.printNeurons()
-        # channel the outputs to the next internal neuron
+
+        # next step:
+        self.p2transferS_I()
+        
+    def p2transferS_I(self):
+        "channel the outputs to the next internal neuron"
+
         print("------------transfer output values s->i")
         for s_i_neurolink in self.sensorToInternal:                               
             sensor_output = next((obj.output for obj in self.sourceNeurons if obj.__class__ == s_i_neurolink.source), 100)
             print(sensor_output)           
             sink_obj = next((obj for obj in self.sinkNeurons if obj.__class__ == s_i_neurolink.sink), None)
             sink_obj.input += sensor_output
-            print(f"{s_i_neurolink.source}->{s_i_neurolink.sink}")
-        # execute all internal neurons
+            print(f"{s_i_neurolink.source} -> {s_i_neurolink.sink}")
+        
+        # next step:
+        self.p3executeInternals()
+
+    def p3executeInternals(self):
+        "execute all internal neurons"
+
         print("-----------execute round 2 (internals)")
         for int_neuron in self.sourceNeurons:
             if int_neuron.__class__ in internal_dict.values():
                 print("internal neurons getting computed")
                 int_neuron.execute()
+
         self.printNeurons()
+
         # clear the input values of each internal neuron
         print("------------clear all internal input values")
         for int_neuron in self.sinkNeurons:
             if int_neuron.__class__ in internal_dict.values():
                 int_neuron.input = 0
-        # feed the outputs of internal neurons linked to another internal neurons into themselves
+        
+        # next step:
+        self.p4transferI_I()
+
+    def p4transferI_I(self):
+        "feed the outputs of internal neurons linked to another internal neurons into themselves"
+
         print("-------------transfer all outputs i->i")
         for i_i_neurolink in self.internalToInternal:
             internal_output = next((obj.output for obj in self.sourceNeurons if obj.__class__ == i_i_neurolink.source), 100)
             sink_obj = next((obj for obj in self.sinkNeurons if obj.__class__ == i_i_neurolink.sink), None)
-            # for obj in self.sinkNeurons:
-            #     print(f"Comparing: {obj.__class__} == {i_i_neurolink.sink}")
-            #     print(f"id(obj.__class__): {id(obj.__class__)}, id(i_i_neurolink.sink): {id(i_i_neurolink.sink)}")
-
-            #     if obj.__class__ == i_i_neurolink.sink:
-            #         print("MATCH FOUND ✅")
-            #         sink_obj = obj
-            #         break
-            # else:
-            #     print("❌ Kein Match gefunden!")
-            #     sink_obj = None
-            # print(f"🚀 sink_obj gefunden: {sink_obj}, input-Wert: {sink_obj.input}")
             sink_obj.input += internal_output
-        # pull all outputs as inputs into the action neurons
+        
+        # next step:
+        self.p5transferSI_A()
+
+    def p5transferSI_A(self):
+        "pull all outputs as inputs into the action neurons"
+
         print("----------transfer all outputs si->a")
         for si_a_neurolink in self.sensor_InternalToAction:
             si_output = next((obj.output for obj in self.sourceNeurons if obj.__class__ == si_a_neurolink.source), 100)
             sink_obj = next((obj for obj in self.sinkNeurons if obj.__class__ == si_a_neurolink.sink), None)
             print("sink input", sink_obj)
             sink_obj.input += si_output
-        # execute all action neurons
+        
+        self.p6executeActions()
+
+    def p6executeActions(self):
+        "execute all action neurons"
+
         print("-----------execute round 3 (actions)")
         for action_neuron in self.sinkNeurons:
             if action_neuron.__class__ in action_dict.values():
                 print("computing action neurons")
                 action_neuron.execute()
+                
         self.printNeurons()
+
         # clear all input values of each action neuron
         print("-------------clear all input values for action neurons")
         for action_neuron in self.sinkNeurons:
             if action_neuron.__class__ in action_dict.values():
-                action_neuron.input = None
-            
+                action_neuron.input = 0
+
+# all das hier unten sollen die neurone selber hinbekommen
+    def transferOutputs(self, source_neuron):
+        "transfer the output value of one Neuron into all linking Neurons"
+
+        for neurolink in self.genes:
+            if neurolink.source == source_neuron.__class__:
+                outputToTransfer = source_neuron.output
+
+                sink_neuron = next((obj for obj in self.sinkNeurons if obj.__class__ == neurolink.sink), None)
+                sink_neuron.input += outputToTransfer
+
+                if sink_neuron.__class__ in action_dict.values() or sink_neuron == source_neuron:
+                    "if the sink is an action neuron or self loop, continue with the next neurolink"
+                    pass
+                elif sink_neuron.__class__ in internal_dict.values():
+                    "if the sink is an internal neuron, compute the next neuron"
+                    self.executeSourceNeuron(sink_neuron)
+                else:
+                    "something unexpectet happen"
+                    raise ReferenceError("neuron linkup got scrambled")
+                
+    def executeSourceNeuron(self, neuron):
+        "execute any source neuron and transfer its outputs"
+        neuron.execute()
+        self.transferOutputs(neuron)
+
+    def executeNeurons(self):
+        "main loop for genome expression: Call all sensor neurons and channel the outputs through to the action neurons"
+
+        # in this loop, only sensor neurons get called but in the executeSourceNeuron-function all linking 
+        for source_neuron in self.sourceNeurons:
+            if source_neuron.__class__ in sensor_dict.values():
+                print("source neurons getting computed")
+                self.executeSourceNeuron(source_neuron)
+
+        # execute all action neurons
+        for action_neuron in self.sinkNeurons:
+            if action_neuron.__class__ in action_dict.values():
+                print("computing action neurons")
+                action_neuron.execute()
+
+        # clear all input values of each action neuron
+        print("-------------clear all input values for action neurons")
+        for action_neuron in self.sinkNeurons:
+            if action_neuron.__class__ in action_dict.values():
+                action_neuron.input = 0
+
+# hier müss im prinzip nur die sensor neurone ausgeführt werden
+    def genomeExpressionMainloop(self):
+        ""
+        for sensor_neuron in self.sourceNeurons:
+            if sensor_neuron.__class__ in sensor_dict.values():
+                sensor_neuron.execute()
 
 class gene(): # OBSOLETE
     """class containing all existing genes. Each gene has a 
@@ -693,15 +806,17 @@ class sensorN():
         self.numOutputs = 0
         self.numSelfInputs = 0
 
+        self.ownSinks = []
+
     def __str__(self):
         return f"pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
     
-    # def getNumOutputs(self):
-    #     return self.numOutputs
-    # def getNumInputs(self):
-    #     return self.numInputs
-    # def getNumSelfInputs(self):
-    #     return self.numSelfInputs
+    def transferOutput(self):
+        ""
+        for sink_obj in self.ownSinks:
+            sink_obj.input += self.output
+            sink_obj.inputTracker += 1
+            sink_obj.checkIfExecute()
     
 class internalN():
     ""
@@ -713,9 +828,29 @@ class internalN():
         self.numInputs = 0
         self.numOutputs = 0
         self.numSelfInputs = 0
+        self.inputTracker = 0
+
+        self.ownSinks = []
 
     def __str__(self):
         return f"pixie {self.attributedPixie}, input {self.input}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+
+    def checkIfExecute(self):
+        if self.inputTracker >= (self.numInputs - self.numSelfInputs):
+            self.execute()
+
+    def transferOutput(self):
+        ""
+        for sink_obj in self.ownSinks:
+            sink_obj.input += self.output
+            if sink_obj != self:
+                sink_obj.inputTracker += 1
+                sink_obj.checkIfExecute()
+
+    def clearInput(self):
+        ""
+        self.input = 0
+        self.inputTracker = 0
 
 class actionN():
     ""
@@ -726,10 +861,19 @@ class actionN():
         self.numInputs = 0
         self.numOutputs = 0
         self.numSelfInputs = 0
+        self.inputTracker = 0
 
     def __str__(self):
         return f"pixie {self.attributedPixie}, input {self.input}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
 
+    def checkIfExecute(self):
+        if self.inputTracker >= (self.numInputs - self.numSelfInputs):
+            self.execute()
+
+    def clearInput(self):
+        ""
+        self.input = 0
+        self.inputTracker = 0
 
 ############# SENSOR NEURONS
 
@@ -751,6 +895,8 @@ class xPosition(sensorN):
         out = xPos / world_width
         print(f"xPosition output: {out}")
         self.output = out
+
+        self.transferOutput()
     
 class yPosition(sensorN):
     "senses the y-Position of the pixie and outputs highest values when on the far north and lowest on the far south"
@@ -769,6 +915,7 @@ class yPosition(sensorN):
         out = yPos / world_width
 
         self.output = out
+        self.transferOutput()
 
 # neuron_dicts are for storing object templates for the corresponding neuron
 sensor_dict = {
@@ -793,7 +940,9 @@ class InterNeuron1(internalN):
         out = math.tanh(self.input)
 
         self.output = out
-        # self.input = 0
+
+        self.clearInput()
+        self.transferOutput()
 
 internal_dict = {
     0: InterNeuron1,
@@ -821,6 +970,8 @@ class moveN(actionN):
             yComponent = -1 * sign # this means that if the weight is negative, the pixie will move in the opposite direction
             self.attributedPixie.moveY += yComponent
 
+        self.clearInput()
+
 class moveS(actionN):
     "move one step to the south"
 
@@ -839,6 +990,8 @@ class moveS(actionN):
         if random.random() < abs(normed_input):
             yComponent = 1 * sign
             self.attributedPixie.moveY += yComponent
+        
+        self.clearInput()
 
 class moveE(actionN):
     "move one step to the north"
@@ -859,6 +1012,8 @@ class moveE(actionN):
             xComponent = 1 * sign
             self.attributedPixie.moveX += xComponent
 
+        self.clearInput()
+
 class moveW(actionN):
     "move one step to the north"
 
@@ -877,6 +1032,8 @@ class moveW(actionN):
         if random.random() < abs(normed_input):
             xComponent = -1 * sign
             self.attributedPixie.moveX += xComponent
+        
+        self.clearInput()
 
 action_dict = {
     0: moveN,
