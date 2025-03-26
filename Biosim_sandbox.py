@@ -13,6 +13,9 @@ class world():
         self.grid = np.empty((size,size), dtype=object)
         self.inhabitants = []
         self.environment = []
+
+        self.queueForMove = set()
+        self.queueForKill = set()
     
     def __str__(self):
         return str(self.grid)
@@ -61,7 +64,7 @@ class object():
     
     def __str__(self):
         
-        return f"\"{self.name}\" at {self.yxPos}"
+        return f"\"{self.name}\" at ({self.yxPos[0]};{self.yxPos[1]})"
     
     def getPosition(otherObject):
         "returns the absolute coordinates of the referenced object"
@@ -75,22 +78,24 @@ class pixie(object):
 
     # listOfFunctions = []
 
-    def __init__(self, worldToInhabit, name, yxPos, color="FF0000", genome=None):
+    def __init__(self, worldToInhabit, name, yxPos, inheritedDNA=None, color="FF0000"):
         ""
         super().__init__(worldToInhabit, name, yxPos)
         #   List of all functions for idividual genes to choose from
         self.energy = defaultEnergy
         self.color = color
-        self.genome = genome
+        self.genome = None
+        self.inheritedDNA = inheritedDNA
         self.shape = "round"
 
         # variables to track the "movement urge" in each simstep. These get reset every new simstep
         self.moveX = 0
         self.moveY = 0
 
-        pixie.listOfFunctions = [
-            self.walkTowards, self.move
-        ]
+        # obsolete!
+        # pixie.listOfFunctions = [
+        #     self.walkTowards, self.move
+        # ]
 
         self.createGenome()
         worldToInhabit.inhabitants.append(self)
@@ -101,14 +106,27 @@ class pixie(object):
 
     def createGenome(self):
         ""
-        self.genome=genome(attributedPixie=self)
+        self.genome=genome(attributedPixie=self, inheritedDNA=self.inheritedDNA)
 
     def executeGenome(self):
         ""
         #self.genome.executeGenes()
-        self.genome.genomeExpressionMainloop()
+        self.genome.executeGenome()
 
     ## moving around
+
+    def executeMove(self):
+        Y_normed = lambda x : int(x > 0) - int(x < 0) # True = 1, False = 0
+        X_normed = lambda x : int(x > 0) - int(x < 0)
+        moveVector = (Y_normed(self.moveY), X_normed(self.moveX))
+        
+        # print(self.moveY, self.moveX)
+        # print(moveVector)
+
+        self.move(vector=moveVector)
+
+        self.moveX = 0
+        self.moveY = 0
 
     def walkTowards(self, otherObject):
         "walk towards the referenced object"
@@ -118,7 +136,6 @@ class pixie(object):
         targetDirection = self.getNormalizedDirection(targetVector)
 
         self.move(world, targetDirection)
-
     
     def move(self, vector):
         "move along a provided vector, but only if the new box is in bounds and empty"
@@ -130,13 +147,12 @@ class pixie(object):
         if self.yxPos[0]+vector[0] < 0 or self.yxPos[0]+vector[0] > np.size(world.grid, 0)-1:
             return
         else:
-            self.yxPos = (self.yxPos[0]+vector[0], self.yxPos[1]+vector[1]) # moving
+            self.yxPos = (int(self.yxPos[0]+vector[0]), int(self.yxPos[1]+vector[1])) # moving
             world.updateWorld()
             #self.energy -= energyDeficitPerMove  #DAS HIER IST AUSGESCHALTET
             if self.energy < 0:
                 self.energy = 0
             # print(f"{self.name} moved by {vector}")
-
 
     def moveRandom(self):
         """move in a random direction but only if the new value is in bounds and the
@@ -271,6 +287,7 @@ class pixie(object):
 
         return relAngle
  
+# environment classes 
 class stone(object):
     ""
 
@@ -289,43 +306,32 @@ class food(object):
         worldToInhabit.environment.append(self)
 
 ################################################
-# GENOME CLASSES
+# GENOME CLASS
 
-"""when a new genome object is instantiated, this actually means that a fixed number of new neurolinks have to be
-generated (as a 32bit integer). This neurolink has a source and sink attribute linked to a specific neuron,
-which can be found by looking in the 'list of functions/neurons'. For each unique source and sink function in the
-whole genome, a Neuron object has to be instantiated for the individual pixie (((First it could be checked if the
-link even results in a connection with an action output or if internal neurons only link to themselves, and if yes
-be discarded to save memory))). All individual neuron objects are tracked in a set{} in the genome object.
-
-Additionally all neurolinks are stored in three separate lists: One for all neurolinks starting from a sensor and
-going to a internal neuron, one for internal-internal connections (neccessary?) and one for internal
-neurons/sensors going to action neurons.
-
-For each simstep the genome then iterates through the sensor-set and stores the output values in the object itself,
-then iterates through the neurolinks to transfer the source-outputs into the sink-neuron (if multiple inputs arrive
-they are added up). After all sensor-linked neurolinks are computed, the internal neurons are called up, and after
-they have computed their input values all action-linked neurolinks are computed to transfer all input values to
-the action neurons, which can finally be executed.
-
-If no functional genome arises (only invalid connections), the executeGenome Function should pass - this could be
-controlled via a 'validNeuralNetwork' bool."""
+"""the genome class assembles the neural network 'brain' of each pixie by asserting source- and sink-neurons.
+The neurolinks generate their own 'DNA'=32bit integer when instantiated and choose their corresponding source- 
+and sink-classes based on the generated DNA string, so completely random yet deterministic.
+Each class that is represented by at least one neurolink is then sorted into a set (allNeuronClasses) and from 
+this set new individual Neurons for the pixie is instantiated (allNeurons). The Neurons get additionally sorted
+into sourceNeurons/sinkNeurons by querying the neurolinks.
+(Most) non-functioning connections or genomes get discarded right at the start to save memory and if no functionality
+arises, the genome never gets executed for this pixie.
+The expression(=execution) of the genome gets controlled by executeGenome()"""
 
 class genome():
     """class containing all existing genomes. 
     Each genome has a corresponding Object it belongs to (currently only Pixies can have genomes)
     and a number of genes=Neurolinks"""
 
-    def __init__(self, attributedPixie):
+    def __init__(self, attributedPixie, inheritedDNA=None):
         ""
         self.attributedPixie = attributedPixie
         self.length = numberOfGenes
-        self.genes = []
+        self.inheritedDNA = inheritedDNA
+        self.genes = [] # actually contains neurolinks
         self.functioningGenome = True
 
         self.allNeuronClasses = set() # includes all neuron class objects
-        self.sources = set() # includes the class objects of all source neurons     # obsolete?
-        self.sinks = set() # includes the class objects of all sink neurons         # obsolete?
 
         self.allNeurons = set() # includes all neuron objects    
         self.sourceNeurons = [] # contains the actual neuron objects
@@ -336,8 +342,12 @@ class genome():
         self.sensor_InternalToAction = []
 
         # instantiate new Neurolink objects
-        for i in range(0, self.length):
-            self.genes.append(Neurolink(self.attributedPixie))
+        if self.inheritedDNA: # instantiate new neurolink objects from old dna
+            for gene in self.inheritedDNA:
+                self.genes.append(Neurolink(self.attributedPixie, gene))
+        else: # generate new DNA from scratch
+            for i in range(0, self.length):
+                self.genes.append(Neurolink(self.attributedPixie))
         
         self.loadGenome()
 
@@ -353,6 +363,7 @@ class genome():
         "return all attributes for each neuron"
         for n in self.allNeurons:
             print(n)
+
 
     def loadGenome(self):
         "sort the neuron objects into the sets and lists above."
@@ -379,29 +390,13 @@ class genome():
         # remove all genes that don't resolve in a logical connection
         self.removeUselessGenes()
 
-        # sort Neurolinks by starting point/destination
-        self.sortNeurolinks() # OBSOLETE
-
         # assert corresponding sinks to every source neuron
         self.assertOwnSinks()
-        for neuron in self.sourceNeurons:
-            print(f"{neuron}: {neuron.ownSinks}")
+        # for neuron in self.sourceNeurons:
+        #     print(f"{neuron}: {neuron.ownSinks}")
 
         # last step: evaluate if the genome is functioning or not
         self.checkFunctioningGenome()
-
-
-    def sortNeurolinks(self): # OBSOLETE?
-        "sort Neurolinks by starting point / destination"
-        for neurolink in self.genes: 
-            if neurolink.DNA[0] == "1" and neurolink.DNA[8] == "0": # sensor to internal
-                self.sensorToInternal.append(neurolink)
-            elif neurolink.DNA[0] == "0" and neurolink.DNA[8] == "0": # internal to internal
-                self.internalToInternal.append(neurolink)
-            elif neurolink.DNA[0] == "1" and neurolink.DNA[8] == "1": # sensor to action
-                self.sensor_InternalToAction.append(neurolink)
-            elif neurolink.DNA[0] == "0" and neurolink.DNA[8] == "1": # internal to action
-                self.sensor_InternalToAction.append(neurolink)
 
     def calculateConnectivity(self):
         "calculate the number of Inputs, Outputs and selfInputs for each neuron"
@@ -433,7 +428,7 @@ class genome():
                 # remove all internal neurons which have numOutputs 0 and the neurolinks that lead to it
                 if neuron.numOutputs == 0:
                     self.sinkNeurons.remove(neuron)
-                    print("removed", neuron)
+                    # print("removed", neuron)
                     try:
                         self.allNeurons.remove(neuron)
                     except ValueError:
@@ -442,11 +437,11 @@ class genome():
                     if selfLinks_to_remove:
                         for selfLink_to_remove in selfLinks_to_remove:
                             self.genes.remove(selfLink_to_remove)
-                            print("removed link", selfLink_to_remove)
+                            # print("removed link", selfLink_to_remove)
                 # remove all internal neurons which have numInputs 0 and the neurolinks that lead from it
                 if neuron.numInputs == 0:
                     self.sinkNeurons.remove(neuron)
-                    print("removed", neuron)
+                    # print("removed", neuron)
                     try:
                         self.allNeurons.remove(neuron)
                     except ValueError:
@@ -455,11 +450,11 @@ class genome():
                     if links_to_remove:
                         for selfLink_to_remove in links_to_remove:
                             self.genes.remove(selfLink_to_remove)
-                            print("removed link", selfLink_to_remove)
-                # remove all internal neurons which have numSelfInputs = numOutputs, + its neurolinks
-                elif neuron.numOutputs == neuron.numSelfInputs and neuron.numSelfInputs > 0:
+                            # print("removed link", selfLink_to_remove)
+                # remove all internal neurons which have numSelfInputs = numOutputs or numInputs, + its neurolinks
+                elif (neuron.numOutputs == neuron.numSelfInputs or neuron.numInputs == neuron.numSelfInputs) and neuron.numSelfInputs > 0:
                     self.sinkNeurons.remove(neuron)
-                    print("removed", neuron)
+                    # print("removed", neuron)
                     try:
                         self.sourceNeurons.remove(neuron)
                         self.allNeurons.remove(neuron)
@@ -469,13 +464,13 @@ class genome():
                     if selfLinks_to_remove:
                         for selfLink_to_remove in selfLinks_to_remove:
                             self.genes.remove(selfLink_to_remove)
-                            print("removed link", selfLink_to_remove)
+                            # print("removed link", selfLink_to_remove)
         # now check if there are any sources left with numOutputs 0 and if yes, remove them
         self.calculateConnectivity()
         for neuron in self.sourceNeurons:
             if neuron.numOutputs == 0:
                 self.sourceNeurons.remove(neuron)
-                print("removed", neuron)
+                # print("removed", neuron)
                 try:
                     self.allNeurons.remove(neuron)
                 except ValueError:
@@ -484,7 +479,7 @@ class genome():
         for neuron in self.sinkNeurons:
             if neuron.numInputs == 0:
                 self.sinkNeurons.remove(neuron) 
-                print("removed", neuron)
+                # print("removed", neuron)
                 try:
                     self.allNeurons.remove(neuron)
                 except ValueError:
@@ -497,7 +492,7 @@ class genome():
         # probably generate an error because it can't find its sink neuron. Should only pop up when multiple internal
         # neurons are enabled.
 
-        #print(f"sources: {self.sources}, sinks: {self.sinks}")
+        # print(f"sources: {self.sourceNeurons}, sinks: {self.sinkNeurons}")
 
     def assertOwnSinks(self):
         "sort the corresponding sink objects into the ownSinks-list of the source neuron"
@@ -505,216 +500,47 @@ class genome():
         for neurolink in self.genes:
             source_neuron = next(obj for obj in self.sourceNeurons if neurolink.source == obj.__class__)
             sink_neuron = next(obj for obj in self.sinkNeurons if neurolink.sink == obj.__class__)
-            source_neuron.ownSinks.append(sink_neuron)
+            weight = neurolink.weight
+            source_neuron.ownSinks.append((sink_neuron, weight))
 
     def checkFunctioningGenome(self):
-        "check whether there is any content in the sourceNeurons or sinkNeurons lists"
+        "check if there are any action neurons in the sink list or sensors in the source list"
+        "this does'nt catch all non-functioning genomes, especially if there are many internal neurons,"
+        "but in most cases this won't be a problem memorywise because the remaining connections will never be called"
 
-        if self.sourceNeurons or self.sinkNeurons:
+        if any(neuron.__class__ in sensor_dict.values() for neuron in self.sourceNeurons) or any(neuron.__class__ in action_dict.values() for neuron in self.sinkNeurons):
             self.functioningGenome = True
         else: 
             self.functioningGenome = False
 
-# brauchen wir die hier noch
-    def executeGenes(self):
-        "main loop for each pixie in each simstep"
-
-        print("-----------execute round 0")
-        print("sources:", self.sourceNeurons)
-        print("sinks:", self.sinkNeurons)
-        print("s_i_neurolinks", self.sensorToInternal)
-        print("i_i_neurolinks", self.internalToInternal)
-        print("si_a_neurolinks", self.sensor_InternalToAction)
-        self.printNeurons()
-
-        # get Inputs from all the sensor Neurons
-        #self.p1executeSensors()
-
-        # transfer first only sensor outputs into internal neurons
-        # self.p2transferS_I()
-
-        # let the Internal Neurons process their inputs
-        # self.p3executeInternals()
-
-        # transfer internal outputs to other internal neurons (or itself)
-        # self.p4transferI_I()
-
-        # pull all outputs into the respective Action Neuron
-        # self.p5transferSI_A()
-
-        # execute the actions
-        # self.p6executeActions()
-
-# fuck this shit, alles hier drunter ist obsolet (vielleicht als backup aufheben, weil es funktioniert zumindest mit 1 internal neuron)
-    def p1executeSensors(self):
-        "execute all sensor neurons"
-
-        print("-----------execute round 1 (sensors)")
-        for source_neuron in self.sourceNeurons:
-            if source_neuron.__class__ in sensor_dict.values():
-                print("sensor neurons getting computed")
-                source_neuron.execute()
-        self.printNeurons()
-
-        # next step:
-        self.p2transferS_I()
-        
-    def p2transferS_I(self):
-        "channel the outputs to the next internal neuron"
-
-        print("------------transfer output values s->i")
-        for s_i_neurolink in self.sensorToInternal:                               
-            sensor_output = next((obj.output for obj in self.sourceNeurons if obj.__class__ == s_i_neurolink.source), 100)
-            print(sensor_output)           
-            sink_obj = next((obj for obj in self.sinkNeurons if obj.__class__ == s_i_neurolink.sink), None)
-            sink_obj.input += sensor_output
-            print(f"{s_i_neurolink.source} -> {s_i_neurolink.sink}")
-        
-        # next step:
-        self.p3executeInternals()
-
-    def p3executeInternals(self):
-        "execute all internal neurons"
-
-        print("-----------execute round 2 (internals)")
-        for int_neuron in self.sourceNeurons:
-            if int_neuron.__class__ in internal_dict.values():
-                print("internal neurons getting computed")
-                int_neuron.execute()
-
-        self.printNeurons()
-
-        # clear the input values of each internal neuron
-        print("------------clear all internal input values")
-        for int_neuron in self.sinkNeurons:
-            if int_neuron.__class__ in internal_dict.values():
-                int_neuron.input = 0
-        
-        # next step:
-        self.p4transferI_I()
-
-    def p4transferI_I(self):
-        "feed the outputs of internal neurons linked to another internal neurons into themselves"
-
-        print("-------------transfer all outputs i->i")
-        for i_i_neurolink in self.internalToInternal:
-            internal_output = next((obj.output for obj in self.sourceNeurons if obj.__class__ == i_i_neurolink.source), 100)
-            sink_obj = next((obj for obj in self.sinkNeurons if obj.__class__ == i_i_neurolink.sink), None)
-            sink_obj.input += internal_output
-        
-        # next step:
-        self.p5transferSI_A()
-
-    def p5transferSI_A(self):
-        "pull all outputs as inputs into the action neurons"
-
-        print("----------transfer all outputs si->a")
-        for si_a_neurolink in self.sensor_InternalToAction:
-            si_output = next((obj.output for obj in self.sourceNeurons if obj.__class__ == si_a_neurolink.source), 100)
-            sink_obj = next((obj for obj in self.sinkNeurons if obj.__class__ == si_a_neurolink.sink), None)
-            print("sink input", sink_obj)
-            sink_obj.input += si_output
-        
-        self.p6executeActions()
-
-    def p6executeActions(self):
-        "execute all action neurons"
-
-        print("-----------execute round 3 (actions)")
-        for action_neuron in self.sinkNeurons:
-            if action_neuron.__class__ in action_dict.values():
-                print("computing action neurons")
-                action_neuron.execute()
-                
-        self.printNeurons()
-
-        # clear all input values of each action neuron
-        print("-------------clear all input values for action neurons")
-        for action_neuron in self.sinkNeurons:
-            if action_neuron.__class__ in action_dict.values():
-                action_neuron.input = 0
-
-# all das hier unten sollen die neurone selber hinbekommen
-    def transferOutputs(self, source_neuron):
-        "transfer the output value of one Neuron into all linking Neurons"
-
-        for neurolink in self.genes:
-            if neurolink.source == source_neuron.__class__:
-                outputToTransfer = source_neuron.output
-
-                sink_neuron = next((obj for obj in self.sinkNeurons if obj.__class__ == neurolink.sink), None)
-                sink_neuron.input += outputToTransfer
-
-                if sink_neuron.__class__ in action_dict.values() or sink_neuron == source_neuron:
-                    "if the sink is an action neuron or self loop, continue with the next neurolink"
-                    pass
-                elif sink_neuron.__class__ in internal_dict.values():
-                    "if the sink is an internal neuron, compute the next neuron"
-                    self.executeSourceNeuron(sink_neuron)
-                else:
-                    "something unexpectet happen"
-                    raise ReferenceError("neuron linkup got scrambled")
-                
-    def executeSourceNeuron(self, neuron):
-        "execute any source neuron and transfer its outputs"
-        neuron.execute()
-        self.transferOutputs(neuron)
-
-    def executeNeurons(self):
-        "main loop for genome expression: Call all sensor neurons and channel the outputs through to the action neurons"
-
-        # in this loop, only sensor neurons get called but in the executeSourceNeuron-function all linking 
-        for source_neuron in self.sourceNeurons:
-            if source_neuron.__class__ in sensor_dict.values():
-                print("source neurons getting computed")
-                self.executeSourceNeuron(source_neuron)
-
-        # execute all action neurons
-        for action_neuron in self.sinkNeurons:
-            if action_neuron.__class__ in action_dict.values():
-                print("computing action neurons")
-                action_neuron.execute()
-
-        # clear all input values of each action neuron
-        print("-------------clear all input values for action neurons")
-        for action_neuron in self.sinkNeurons:
-            if action_neuron.__class__ in action_dict.values():
-                action_neuron.input = 0
-
-# hier müss im prinzip nur die sensor neurone ausgeführt werden
-    def genomeExpressionMainloop(self):
-        ""
-        for sensor_neuron in self.sourceNeurons:
-            if sensor_neuron.__class__ in sensor_dict.values():
-                sensor_neuron.execute()
-
-class gene(): # OBSOLETE
-    """class containing all existing genes. Each gene has a 
-    functionality (one of the methods of Pixies) and a floating point probability of being expressed. 
-    0 by default, can mutate."""
     
-    def __init__(self):
-        ""
-        #self.DNA = self.generateDNA()
+    def executeGenome(self):
+        "execute all sensor neurons, the neural network will do the rest"
+        if self.functioningGenome:
+            for sensor_neuron in self.sourceNeurons:
+                if sensor_neuron.__class__ in sensor_dict.values():
+                    sensor_neuron.execute()
 
-    def __str__(self):
 
-        return
-
-
-    def executeFunctionality(self):
-        "executing the function encoded in the gene with the specific expressionProbaility"
-        
 
 ################################################
 # NEURAL NETWORK
 
+"""Neurolinks form connections between Neuron objects by telling the Genome-class which sources and sinks belong
+to each other. They generate these connections randomly by birth or can inherit them from previous pixies."""
+
 class Neurolink():
     ""
 
-    def __init__(self, attributedPixie):
+    def __init__(self, attributedPixie, inheritedDNA=None):
         self.attributedPixie = attributedPixie
-        self.DNA = self.generateDNA()
+        self.inheritedDNA = inheritedDNA
+        if not inheritedDNA:
+            self.DNA = self.generateDNA()
+        else:
+            self.DNA = inheritedDNA
+            if len(self.DNA) != 32:
+                raise ValueError("DNA is not 32 characters long!")
         self.source = None
         self.sink = None
         self.weight = None
@@ -796,6 +622,17 @@ class Neurolink():
 #############################################
 # NEURONS AND FUNCTIONS
 
+"""There are three superclasses of neurons: sensor Neurons, internal Neurons and action Neurons.
+In each superclass there are subclasses which represent the single neurons which in turn are responsible
+for the functions that each pixie can express.
+Neuron objects get instantiated individually for each pixie and store their own inputs, outputs and corresponding
+sinks (if any) and weights.
+
+Neurons act very autonomously and execute automatically when enough inputs have arrived (apart from sensor neurons),
+and also automatically transfer these outputs to the next neuron (unless they are an action neuron).
+
+Neuron classes are stored in neuron_dicts so they can be referenced by Neurolinks or other functions."""
+
 # Superclasses for the different Neurons
 class sensorN():
     ""
@@ -806,17 +643,17 @@ class sensorN():
         self.numOutputs = 0
         self.numSelfInputs = 0
 
-        self.ownSinks = []
+        self.ownSinks = [] # contains tuples with (sink_object, weight)
 
     def __str__(self):
         return f"pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
     
     def transferOutput(self):
         ""
-        for sink_obj in self.ownSinks:
-            sink_obj.input += self.output
-            sink_obj.inputTracker += 1
-            sink_obj.checkIfExecute()
+        for sink_weight in self.ownSinks:
+            sink_weight[0].input += self.output * sink_weight[1]
+            sink_weight[0].inputTracker += 1
+            sink_weight[0].checkIfExecute()
     
 class internalN():
     ""
@@ -830,7 +667,7 @@ class internalN():
         self.numSelfInputs = 0
         self.inputTracker = 0
 
-        self.ownSinks = []
+        self.ownSinks = [] # contains tuples with (sink_object, weight)
 
     def __str__(self):
         return f"pixie {self.attributedPixie}, input {self.input}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
@@ -841,11 +678,11 @@ class internalN():
 
     def transferOutput(self):
         ""
-        for sink_obj in self.ownSinks:
-            sink_obj.input += self.output
-            if sink_obj != self:
-                sink_obj.inputTracker += 1
-                sink_obj.checkIfExecute()
+        for sink_weight in self.ownSinks:
+            sink_weight[0].input += self.output * sink_weight[1]
+            if sink_weight[0] != self:
+                sink_weight[0].inputTracker += 1
+                sink_weight[0].checkIfExecute()
 
     def clearInput(self):
         ""
@@ -893,7 +730,7 @@ class xPosition(sensorN):
         world_width = self.attributedPixie.worldToInhabit.size
 
         out = xPos / world_width
-        print(f"xPosition output: {out}")
+        # print(f"xPosition output: {out}")
         self.output = out
 
         self.transferOutput()
@@ -944,9 +781,28 @@ class InterNeuron1(internalN):
         self.clearInput()
         self.transferOutput()
 
+class InterNeuron2(internalN):
+    "run the input through a tanh function and return the value"
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+    
+    def __str__(self):
+        return f"Internal Neuron 2: pixie {self.attributedPixie}, input {self.input}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+
+    def execute(self):
+        "run the input through a tanh function and return the value"
+
+        out = math.tanh(self.input)
+
+        self.output = out
+
+        self.clearInput()
+        self.transferOutput()
+
 internal_dict = {
     0: InterNeuron1,
-    1: InterNeuron1
+    1: InterNeuron2,
+    2: InterNeuron1
 } # first and last index always has to code for the same neuron!
 
 ############# ACTION NEURONS
@@ -971,6 +827,7 @@ class moveN(actionN):
             self.attributedPixie.moveY += yComponent
 
         self.clearInput()
+        self.attributedPixie.worldToInhabit.queueForMove.add(self.attributedPixie)
 
 class moveS(actionN):
     "move one step to the south"
@@ -992,6 +849,7 @@ class moveS(actionN):
             self.attributedPixie.moveY += yComponent
         
         self.clearInput()
+        self.attributedPixie.worldToInhabit.queueForMove.add(self.attributedPixie)
 
 class moveE(actionN):
     "move one step to the north"
@@ -1013,6 +871,7 @@ class moveE(actionN):
             self.attributedPixie.moveX += xComponent
 
         self.clearInput()
+        self.attributedPixie.worldToInhabit.queueForMove.add(self.attributedPixie)
 
 class moveW(actionN):
     "move one step to the north"
@@ -1034,6 +893,7 @@ class moveW(actionN):
             self.attributedPixie.moveX += xComponent
         
         self.clearInput()
+        self.attributedPixie.worldToInhabit.queueForMove.add(self.attributedPixie)
 
 action_dict = {
     0: moveN,
@@ -1044,26 +904,178 @@ action_dict = {
 } # first and last index always has to code for the same neuron!
 
 
+################################################
+# SIMULATOR FUNCTIONS
+
+def eachSimStep(world):
+    ""
+    # execute the genome for each pixie in the world
+    for pixie in world.getInhabitants():
+        pixie.executeGenome()
+
+    # execute all actions that have been queued:
+    for pixie in world.queueForMove:
+        pixie.executeMove()
+    for pixie in world.queueForKill:
+        ""
+    world.queueForMove = set()
+    world.queueForKill = set()
+
+    # create a frame for the gif
+    if createGIF:  
+        render.render(world)
+
+def spawnPixie(world, inheritedDNA=None, newHexColor=None):
+    "spawn a single pixie"
+
+    # a pixie needs a world to inhabit, a new name, and optionally a color or inherited DNA
+    newPixieName = "Pixie_" + str(random.randint(0,9999))
+    if not newHexColor:
+        newHexColor = "%06x" % random.randint(0,0xFFFFFF) # maybe obsolete
+    t = 0
+    while t < 1:
+        newYXPos = (random.randint(0, np.size(world.grid, 0)-1), random.randint(0, np.size(world.grid, 0)-1))
+        if world.grid[newYXPos]: # check if cell is already inhabited
+            continue
+        t += 1
+
+    newPixieName = pixie(worldToInhabit=world, name=newPixieName, yxPos=newYXPos, inheritedDNA=inheritedDNA, color=newHexColor)
+    world.updateWorld()
+
+def newGeneration(oldWorld=None, existingGenomes=None):
+    "spawn a new generation"
+
+    if oldWorld: # inherit genes from the predecessing generation
+        oldPopulation = oldWorld.inhabitants
+        newWorld = world(size=gridsize)
+
+        for i in range(numberOfPixies):
+            predecessor = random.choice(oldPopulation)
+
+            inheritedGenes = [neurolink.DNA for neurolink in predecessor.genome.genes]
+            possiblyMutatedDNA = mutateGenes(gene_list=inheritedGenes)
+
+            inheritedColor = predecessor.color # this doesn't allow for color mutations
+
+            spawnPixie(newWorld, inheritedDNA=possiblyMutatedDNA, newHexColor=inheritedColor)
+
+    else: # inherit genes from predetermined Populations
+        newWorld = world(size=gridsize)
+        if existingGenomes:
+            for genome in existingGenomes:
+                spawnPixie(newWorld, inheritedDNA=genome)
+        else: # generate new genes from scratch
+            for i in range(numberOfPixies):
+                spawnPixie(newWorld)
+    
+    return newWorld
+
+def mutateGenes(gene_list):
+    "iterate through the DNA bits and change it with a small chance"
+    
+    for gene in gene_list:
+        for i in range(len(gene)):
+            if random.random() < mutationRate:
+                gene[i] = 1 if gene[i] == 0 else 0
+    return gene_list
+
+def saveMetaGenome(world):
+    "save the Genomes of all pixies in a csv file"
+
+    # genes contains neurolink objects, which have the attributes .attributedPixie, .DNA, .source, .sink and .weight
+    genomes_list = [inhabitant.genome.genes for inhabitant in world.getInhabitants()]
+
+    with open(f"metagenome.txt", "w") as textfile:
+        textfile.write("PixieName,DNA,connections\n")
+        for genes_list in genomes_list:
+            DNA_list = []
+            sources_list = []
+            sinks_list = []
+            connections_list = []
+            pixieName = "placeholder"
+            for neurolink in genes_list:
+                pixieName = neurolink.attributedPixie
+                DNA_list.append(neurolink.DNA)
+                sources_list.append(neurolink.source)
+                sinks_list.append(neurolink.sink)
+
+            connections = zip(sources_list, sinks_list)
+            for i in connections:
+                connections_list.append(str(i))
+            connections_str = ";".join(connections_list)
+            DNA_str = ";".join(DNA_list)
+
+            textfile.write(f"{pixieName},{DNA_str},{connections_str}\n")
+
+def readMetaGenome(textfile):
+    "read the metagenome textfile and extract the DNA of each Pixie, and save it in a list"
+
+    metagenome = []
+
+    with open(textfile, "r") as metagenome_file:
+        for i, line in enumerate(metagenome_file):
+            if i > 0:
+                elements = line.strip().split(",")
+                # the DNA should be in the second column
+                genome = elements[1].split(";")
+                print(genome)
+                metagenome.append(genome)
+
+    return metagenome
+
+
+def simulateGenerations(startingPopulation=None):
+    "Randomly simulate as many generations as specified. Optionally provide a starting Population (metagenome)."
+    # first generation: 
+    firstWorld = newGeneration(existingGenomes=startingPopulation)
+    for i in range(numberOfSimSteps):
+        eachSimStep(firstWorld)
+    if createGIF:
+        render.create_gif(filename=f"world_1.gif")
+
+    # following generations:
+    oldWorld = firstWorld
+    for num in range(numberOfGenerations-1):
+        newWorld = newGeneration(oldWorld=oldWorld)
+        for i in range(numberOfSimSteps):
+            eachSimStep(newWorld)
+        if createGIF:
+            render.create_gif(filename=f"world_{num+2}.gif")
+        oldWorld = newWorld
+
+        # in the last world, save the metagenome
+        if save_metagenome:
+            saveMetaGenome(newWorld)
+
+        # kill off pixies that aren't fit enough
+
 
 ################################################
 # PARAMETERS
 
+gridsize = 20
 numberOfGenes = 4
+numberOfPixies = 30
+numberOfGenerations = 20
+numberOfSimSteps = 10
+mutationRate = 0
 
 defaultEnergy = 0
+
+save_metagenome = False
+createGIF = False
 
 ################################################
 # MANUAL INSTANCING
 
-grid0 = world(size=10)
+# grid0 = world(size=10)
 
-myPixie = pixie(grid0, "myPixie1", (3, 4))
-myGenome = myPixie.getGenome()
-myGenes = myGenome.getGenes()
-for i in myGenes:
-    print(i)
-if myGenome.functioningGenome:
-    myPixie.executeGenome()
-else:
-    print("no functioning genome")
-print(myPixie.yxPos, myPixie.moveY, myPixie.moveX)
+# myPixie = pixie(grid0, "myPixie1", (3, 4))
+# myGenome = myPixie.getGenome()
+# myGenes = myGenome.getGenes()
+# for i in myGenes:
+#     print(i)
+
+#simulateGenerations()
+simulateGenerations(readMetaGenome("metagenome.txt")) # a metagenome object can be provided as an argument if a previous population 
+

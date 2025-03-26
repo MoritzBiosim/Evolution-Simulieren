@@ -4,7 +4,7 @@ import gc
 
 gif_frames = []
 # aufzurufen als render.render(grid0)
-def render(world, circleDiameter=30, spacing=0):
+def render(world, circleDiameter=30, spacing=0, show_image=False):
 
     matrixSize = np.size(world.grid, 0)
     cellSize = circleDiameter + spacing
@@ -40,10 +40,12 @@ def render(world, circleDiameter=30, spacing=0):
        
         
     gif_frames.append(image)
-    #image.show()
+    if show_image:
+        image.show()
 
-def create_gif():
-    gif_frames[0].save("BS_oop3.gif", save_all=True, append_images=gif_frames[1:],duration=400, loop=0)
+def create_gif(filename="sandbox.gif"):
+    gif_frames[0].save(filename, save_all=True, append_images=gif_frames[1:],duration=400, loop=0)
+    clear_gif()
 
 def clear_gif():
     "clears the gif_frames list"
