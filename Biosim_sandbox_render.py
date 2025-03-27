@@ -1,4 +1,5 @@
 import numpy as np
+import math
 from PIL import Image, ImageDraw
 import gc
 
@@ -37,6 +38,15 @@ def render(world, circleDiameter=30, spacing=0, show_image=False):
                 draw.polygon(((top_left[0] + cellSize/2, top_left[1] + cellSize/10), (bottom_right[0],bottom_right[1]), (bottom_right[0] - cellSize, bottom_right[1])), fill=rgb_color, outline="black")                
                 #sticker = Image.open("flower30x30.jpg")
                 #image.paste(sticker, (top_left[0], top_left[1]))
+            
+            # if facing, calculate position of facing-point
+            if hasattr(object, "facing"):
+                facing_y = math.sin(object.facing) * (circleDiameter/2)
+                facing_x = math.cos(object.facing) * (circleDiameter/2)
+                x_point = object.yxPos[1] * cellSize + spacing +15 + facing_x
+                y_point = object.yxPos[0] * cellSize + spacing +15 + facing_y
+
+                draw.circle(xy=(x_point, y_point), radius=4, fill=rgb_color)
        
         
     gif_frames.append(image)

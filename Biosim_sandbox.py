@@ -87,6 +87,7 @@ class pixie(object):
         self.genome = None
         self.inheritedDNA = inheritedDNA
         self.shape = "round"
+        self.facing = 0 
 
         # variables to track the "movement urge" in each simstep. These get reset every new simstep
         self.moveX = 0
@@ -143,11 +144,18 @@ class pixie(object):
         world = self.worldToInhabit # this makes providing the argument "world" obsolete
 
         if self.yxPos[1]+vector[1] < 0 or self.yxPos[1]+vector[1] > np.size(world.grid, 0)-1:
+            # out of bounds
             return
         if self.yxPos[0]+vector[0] < 0 or self.yxPos[0]+vector[0] > np.size(world.grid, 0)-1:
+            # out of bounds
+            return
+        if world.grid[(int(self.yxPos[0]+vector[0]), int(self.yxPos[1]+vector[1]))]:
+            # cell already inhabited
             return
         else:
             self.yxPos = (int(self.yxPos[0]+vector[0]), int(self.yxPos[1]+vector[1])) # moving
+            self.facing = self.getRelativeAngle(relVector=vector) # update "facing"-direction
+
             world.updateWorld()
             #self.energy -= energyDeficitPerMove  #DAS HIER IST AUSGESCHALTET
             if self.energy < 0:
@@ -164,17 +172,20 @@ class pixie(object):
 
     ## scanning neighbourhood
 
-    def getNormalizedDirection(self, object=None, vector=None):
-        """return the direction of a referenced object OR vector as a vector tuple by checking 
+    def getNormalizedDirection(self, object=None, vector=None, angle=None):
+        """return the direction of a referenced object OR vector OR angle as a vector tuple by checking 
         if the calculated angle is within 22.5° of any cardinal direction"""
 
-        if not vector and not object:
-            raise ValueError("neither an object or vector was provided")
+        if not vector and not object and not angle:
+            raise ValueError("neither an object, vector or angle was provided")
         
         if vector:
             angle = self.getRelativeAngle(relVector=vector)
         elif object:
             angle = self.getRelativeAngle(otherObject=object)
+
+        if angle < 0:
+            angle = angle + 2*math.pi
 
         if abs(0 - angle) < (1/8) * math.pi or abs(2*math.pi - angle) < (1/8) * math.pi: # 0° and 360°
             direction = (0,1)
@@ -196,7 +207,7 @@ class pixie(object):
         return direction
 
 
-    def searchNeighbourhood(self):
+    def searchNeighbourhood(self, searchRadius=5):
         "scans the surrounding grid and returns a list of all objects within the search radius"
 
         world = self.worldToInhabit # this makes providing the argument "world" obsolete
@@ -204,9 +215,9 @@ class pixie(object):
         foundObjects = []
         gridSize = np.size(world.grid, 0) # edge length of the grid (only works for square grids)
 
-        for x in range(max(0, self.yxPos[1] - self.searchRadius), min(gridSize, self.yxPos[1] + self.searchRadius)):
-            for y in range(max(0, self.yxPos[0] - self.searchRadius), min(gridSize, self.yxPos[0] + self.searchRadius)):
-                if math.sqrt((x-self.yxPos[1])**2 + (y - self.yxPos[0])**2) <= self.searchRadius:
+        for x in range(max(0, self.yxPos[1] - searchRadius), min(gridSize, self.yxPos[1] + searchRadius)):
+            for y in range(max(0, self.yxPos[0] - searchRadius), min(gridSize, self.yxPos[0] + searchRadius)):
+                if math.sqrt((x-self.yxPos[1])**2 + (y - self.yxPos[0])**2) <= searchRadius:
                     if world.grid[y,x] and world.grid[y,x] != self:
                         foundObjects.append(world.grid[y,x])
         return foundObjects
@@ -276,11 +287,15 @@ class pixie(object):
 
         return dy, dx
     
-    def getRelativeAngle(self, otherObject):
+    def getRelativeAngle(self, otherObject=None, relVector=None):
         """returns the angle of the referenced object in relation to self, angles
         are expressed as radiant with range (-pi/pi), going clockwise from the right"""
 
-        relVector = self.getRelativeVector(otherObject)
+        if not otherObject and not relVector:
+            raise ValueError("neither an object nor a vector was provided")
+
+        if otherObject:
+            relVector = self.getRelativeVector(otherObject)
         relAngle = math.atan2(relVector[0],relVector[1])
         if relAngle < 0 : 
             relAngle += 2*math.pi # angle now runs counterclockwise starting east
@@ -334,12 +349,12 @@ class genome():
         self.allNeuronClasses = set() # includes all neuron class objects
 
         self.allNeurons = set() # includes all neuron objects    
-        self.sourceNeurons = [] # contains the actual neuron objects
-        self.sinkNeurons = []
+        self.sourceNeurons = [] # contains all source neurons
+        self.sinkNeurons = [] # contains all sink neurons
         
-        self.sensorToInternal = []
-        self.internalToInternal = []
-        self.sensor_InternalToAction = []
+        self.sensorToInternal = [] # obsolete
+        self.internalToInternal = [] # obsolete
+        self.sensor_InternalToAction = [] # obsolete
 
         # instantiate new Neurolink objects
         if self.inheritedDNA: # instantiate new neurolink objects from old dna
@@ -895,6 +910,103 @@ class moveW(actionN):
         self.clearInput()
         self.attributedPixie.worldToInhabit.queueForMove.add(self.attributedPixie)
 
+class moveB(actionN):
+    "move backwards in respect to the 'facing'-direction"
+
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+    
+    def __str__(self):
+        return f"moveB: pixie {self.attributedPixie}, input {self.input}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+
+    def execute(self):
+        "input gets converted into a probability, then executed"
+        normed_input = math.tanh(self.input)
+        sign = np.sign(normed_input)
+
+        if random.random() < abs(normed_input):
+            facing_angle = self.attributedPixie.facing
+            moveVector = self.attributedPixie.getNormalizedDirection(facing_angle+math.pi) # turn 180 degrees 
+
+            self.attributedPixie.moveY = moveVector[0] * sign
+            self.attributedPixie.moveX = moveVector[1] * sign
+        
+        self.clearInput()
+        self.attributedPixie.worldToInhabit.queueForMove.add(self.attributedPixie)
+
+class moveF(actionN):
+    "move forward in respect to the 'facing'-direction"
+
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+    
+    def __str__(self):
+        return f"moveF: pixie {self.attributedPixie}, input {self.input}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+
+    def execute(self):
+        "input gets converted into a probability, then executed"
+        normed_input = math.tanh(self.input)
+        sign = np.sign(normed_input)
+
+        if random.random() < abs(normed_input):
+            facing_angle = self.attributedPixie.facing
+            moveVector = self.attributedPixie.getNormalizedDirection(facing_angle) # same direction
+
+            self.attributedPixie.moveY = moveVector[0] * sign
+            self.attributedPixie.moveX = moveVector[1] * sign
+        
+        self.clearInput()
+        self.attributedPixie.worldToInhabit.queueForMove.add(self.attributedPixie)
+
+class moveR(actionN):
+    "move backwards in respect to the 'facing'-direction"
+
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+    
+    def __str__(self):
+        return f"moveR: pixie {self.attributedPixie}, input {self.input}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+
+    def execute(self):
+        "input gets converted into a probability, then executed"
+        normed_input = math.tanh(self.input)
+        sign = np.sign(normed_input)
+
+        if random.random() < abs(normed_input):
+            facing_angle = self.attributedPixie.facing
+            moveVector = self.attributedPixie.getNormalizedDirection(facing_angle-math.pi/2) # turn 90 degrees to the left 
+
+            self.attributedPixie.moveY = moveVector[0] * sign
+            self.attributedPixie.moveX = moveVector[1] * sign
+        
+        self.clearInput()
+        self.attributedPixie.worldToInhabit.queueForMove.add(self.attributedPixie)
+
+class moveL(actionN):
+    "move backwards in respect to the 'facing'-direction"
+
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+    
+    def __str__(self):
+        return f"moveL: pixie {self.attributedPixie}, input {self.input}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+
+    def execute(self):
+        "input gets converted into a probability, then executed"
+        normed_input = math.tanh(self.input)
+        sign = np.sign(normed_input)
+
+        if random.random() < abs(normed_input):
+            facing_angle = self.attributedPixie.facing
+            moveVector = self.attributedPixie.getNormalizedDirection(facing_angle+math.pi/2) # turn 90 degrees to the left
+
+            self.attributedPixie.moveY = moveVector[0] * sign
+            self.attributedPixie.moveX = moveVector[1] * sign
+        
+        self.clearInput()
+        self.attributedPixie.worldToInhabit.queueForMove.add(self.attributedPixie)
+
+
 action_dict = {
     0: moveN,
     1: moveS,
@@ -1018,7 +1130,7 @@ def readMetaGenome(textfile):
                 elements = line.strip().split(",")
                 # the DNA should be in the second column
                 genome = elements[1].split(";")
-                print(genome)
+
                 metagenome.append(genome)
 
     return metagenome
@@ -1026,6 +1138,9 @@ def readMetaGenome(textfile):
 
 def simulateGenerations(startingPopulation=None):
     "Randomly simulate as many generations as specified. Optionally provide a starting Population (metagenome)."
+
+    print("simulating...")
+
     # first generation: 
     firstWorld = newGeneration(existingGenomes=startingPopulation)
     for i in range(numberOfSimSteps):
@@ -1049,6 +1164,7 @@ def simulateGenerations(startingPopulation=None):
 
         # kill off pixies that aren't fit enough
 
+    print("all done!")
 
 ################################################
 # PARAMETERS
@@ -1063,7 +1179,7 @@ mutationRate = 0
 defaultEnergy = 0
 
 save_metagenome = False
-createGIF = False
+createGIF = True
 
 ################################################
 # MANUAL INSTANCING
