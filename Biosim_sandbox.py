@@ -1,6 +1,7 @@
 import random
 import numpy as np
-import math
+import math 
+import time
 import Biosim_sandbox_render as render
 
 
@@ -1140,7 +1141,7 @@ def simulateGenerations(startingPopulation=None):
     "Randomly simulate as many generations as specified. Optionally provide a starting Population (metagenome)."
 
     print("simulating...")
-
+    start_time = time.time()
     # first generation: 
     firstWorld = newGeneration(existingGenomes=startingPopulation)
     for i in range(numberOfSimSteps):
@@ -1150,7 +1151,7 @@ def simulateGenerations(startingPopulation=None):
 
     # following generations:
     oldWorld = firstWorld
-    for num in range(numberOfGenerations-1):
+    for num in range(numberOfGenerations-1): # -1 because the first world already got created
         newWorld = newGeneration(oldWorld=oldWorld)
         for i in range(numberOfSimSteps):
             eachSimStep(newWorld)
@@ -1159,27 +1160,29 @@ def simulateGenerations(startingPopulation=None):
         oldWorld = newWorld
 
         # in the last world, save the metagenome
-        if save_metagenome:
-            saveMetaGenome(newWorld)
+        if num == numberOfGenerations-2:
+            if save_metagenome:
+                saveMetaGenome(newWorld)
 
         # kill off pixies that aren't fit enough
-
+    
     print("all done!")
+    print(f"time elapsed: {time.time() - start_time} seconds")
 
 ################################################
 # PARAMETERS
 
-gridsize = 20
+gridsize = 50
 numberOfGenes = 4
-numberOfPixies = 30
-numberOfGenerations = 20
-numberOfSimSteps = 10
+numberOfPixies = 200
+numberOfGenerations = 100
+numberOfSimSteps = 100
 mutationRate = 0
 
 defaultEnergy = 0
 
 save_metagenome = False
-createGIF = True
+createGIF = False
 
 ################################################
 # MANUAL INSTANCING
