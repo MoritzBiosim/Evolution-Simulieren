@@ -4,6 +4,7 @@ import numpy as np
 import random
 
 
+
 # Superclasses for the different Neurons
 class sensorN():
     ""

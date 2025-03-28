@@ -1,6 +1,7 @@
 "This file contains all functions that apply selection criteria"
 
 
+
 def doNothing(world):
     "do nothing"
     pass

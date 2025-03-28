@@ -874,7 +874,7 @@ def simulateGenerations(startingPopulation=None):
 gridsize = 50
 numberOfGenes = 4
 numberOfPixies = 500
-numberOfGenerations = 100
+numberOfGenerations = 101
 numberOfSimSteps = 15
 mutationRate = 0
 
