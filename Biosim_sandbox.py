@@ -3,6 +3,8 @@ import numpy as np
 import math 
 import time
 import Biosim_sandbox_render as render
+import Biosim_sandbox_neurons as neurons
+import Biosim_sandbox_selection as selection
 
 
 class world():
@@ -157,7 +159,7 @@ class pixie(object):
             self.yxPos = (int(self.yxPos[0]+vector[0]), int(self.yxPos[1]+vector[1])) # moving
             self.facing = self.getRelativeAngle(relVector=vector) # update "facing"-direction
 
-            world.updateWorld()
+            # world.updateWorld() # <<<<<<<<<<< this may be needed
             #self.energy -= energyDeficitPerMove  #DAS HIER IST AUSGESCHALTET
             if self.energy < 0:
                 self.energy = 0
@@ -444,7 +446,7 @@ class genome():
                 # remove all internal neurons which have numOutputs 0 and the neurolinks that lead to it
                 if neuron.numOutputs == 0:
                     self.sinkNeurons.remove(neuron)
-                    # print("removed", neuron)
+                    #print("removed", neuron)
                     try:
                         self.allNeurons.remove(neuron)
                     except ValueError:
@@ -453,7 +455,7 @@ class genome():
                     if selfLinks_to_remove:
                         for selfLink_to_remove in selfLinks_to_remove:
                             self.genes.remove(selfLink_to_remove)
-                            # print("removed link", selfLink_to_remove)
+                            #print("removed link", selfLink_to_remove)
                 # remove all internal neurons which have numInputs 0 and the neurolinks that lead from it
                 if neuron.numInputs == 0:
                     self.sinkNeurons.remove(neuron)
@@ -649,378 +651,42 @@ and also automatically transfer these outputs to the next neuron (unless they ar
 
 Neuron classes are stored in neuron_dicts so they can be referenced by Neurolinks or other functions."""
 
-# Superclasses for the different Neurons
-class sensorN():
-    ""
-    def __init__(self, attributedPixie):
-        self.attributedPixie = attributedPixie # this is crucial so that each instantiated function can reference its own pixie
-        self.output = 0
-        self.numInputs = 0
-        self.numOutputs = 0
-        self.numSelfInputs = 0
-
-        self.ownSinks = [] # contains tuples with (sink_object, weight)
-
-    def __str__(self):
-        return f"pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
-    
-    def transferOutput(self):
-        ""
-        for sink_weight in self.ownSinks:
-            sink_weight[0].input += self.output * sink_weight[1]
-            sink_weight[0].inputTracker += 1
-            sink_weight[0].checkIfExecute()
-    
-class internalN():
-    ""
-
-    def __init__(self, attributedPixie):
-        self.attributedPixie = attributedPixie
-        self.input = 0
-        self.output = 0
-        self.numInputs = 0
-        self.numOutputs = 0
-        self.numSelfInputs = 0
-        self.inputTracker = 0
-
-        self.ownSinks = [] # contains tuples with (sink_object, weight)
-
-    def __str__(self):
-        return f"pixie {self.attributedPixie}, input {self.input}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
-
-    def checkIfExecute(self):
-        if self.inputTracker >= (self.numInputs - self.numSelfInputs):
-            self.execute()
-
-    def transferOutput(self):
-        ""
-        for sink_weight in self.ownSinks:
-            sink_weight[0].input += self.output * sink_weight[1]
-            if sink_weight[0] != self:
-                sink_weight[0].inputTracker += 1
-                sink_weight[0].checkIfExecute()
-
-    def clearInput(self):
-        ""
-        self.input = 0
-        self.inputTracker = 0
-
-class actionN():
-    ""
-
-    def __init__(self, attributedPixie):
-        self.attributedPixie = attributedPixie
-        self.input = 0
-        self.numInputs = 0
-        self.numOutputs = 0
-        self.numSelfInputs = 0
-        self.inputTracker = 0
-
-    def __str__(self):
-        return f"pixie {self.attributedPixie}, input {self.input}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
-
-    def checkIfExecute(self):
-        if self.inputTracker >= (self.numInputs - self.numSelfInputs):
-            self.execute()
-
-    def clearInput(self):
-        ""
-        self.input = 0
-        self.inputTracker = 0
-
-############# SENSOR NEURONS
-
-class xPosition(sensorN):
-    "senses the x-Position of the pixie and outputs highest values when on the far right and lowest on the far left"
-
-    def __init__(self, attributedPixie):
-        super().__init__(attributedPixie)
-
-    def __str__(self):
-        return f"xPosition: pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
-
-
-    def execute(self):
-        ""
-        xPos = self.attributedPixie.yxPos[1]
-        world_width = self.attributedPixie.worldToInhabit.size
-
-        out = xPos / world_width
-        # print(f"xPosition output: {out}")
-        self.output = out
-
-        self.transferOutput()
-    
-class yPosition(sensorN):
-    "senses the y-Position of the pixie and outputs highest values when on the far north and lowest on the far south"
-
-    def __init__(self, attributedPixie):
-        super().__init__(attributedPixie)
-
-    def __str__(self):
-        return f"yPosition: pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
-
-    def execute(self):
-        ""
-        yPos = self.attributedPixie.yxPos[0]
-        world_width = self.attributedPixie.worldToInhabit.size
-
-        out = yPos / world_width
-
-        self.output = out
-        self.transferOutput()
 
 # neuron_dicts are for storing object templates for the corresponding neuron
 sensor_dict = {
-    0: xPosition,
-    1: yPosition,
-    2: xPosition
+    0: neurons.xPosition,
+    1: neurons.yPosition,
+    2: neurons.xPosition
 } # first and last index always has to code for the same neuron!
-
-############# INTERNAL NEURONS
-
-class InterNeuron1(internalN):
-    "run the input through a tanh function and return the value"
-    def __init__(self, attributedPixie):
-        super().__init__(attributedPixie)
-    
-    def __str__(self):
-        return f"Internal Neuron 1: pixie {self.attributedPixie}, input {self.input}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
-
-    def execute(self):
-        "run the input through a tanh function and return the value"
-
-        out = math.tanh(self.input)
-
-        self.output = out
-
-        self.clearInput()
-        self.transferOutput()
-
-class InterNeuron2(internalN):
-    "run the input through a tanh function and return the value"
-    def __init__(self, attributedPixie):
-        super().__init__(attributedPixie)
-    
-    def __str__(self):
-        return f"Internal Neuron 2: pixie {self.attributedPixie}, input {self.input}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
-
-    def execute(self):
-        "run the input through a tanh function and return the value"
-
-        out = math.tanh(self.input)
-
-        self.output = out
-
-        self.clearInput()
-        self.transferOutput()
 
 internal_dict = {
-    0: InterNeuron1,
-    1: InterNeuron2,
-    2: InterNeuron1
+    0: neurons.InterNeuron1,
+    1: neurons.InterNeuron2,
+    2: neurons.InterNeuron1
 } # first and last index always has to code for the same neuron!
-
-############# ACTION NEURONS
-
-class moveN(actionN):
-    "move one step to the north"
-
-    def __init__(self, attributedPixie):
-        super().__init__(attributedPixie)
-
-    def __str__(self):
-        return f"moveN: pixie {self.attributedPixie}, input {self.input}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
-
-
-    def execute(self):
-        "input gets converted to a probability, then executed"
-        normed_input = math.tanh(self.input)
-        sign = np.sign(normed_input)
-
-        if random.random() < abs(normed_input):
-            yComponent = -1 * sign # this means that if the weight is negative, the pixie will move in the opposite direction
-            self.attributedPixie.moveY += yComponent
-
-        self.clearInput()
-        self.attributedPixie.worldToInhabit.queueForMove.add(self.attributedPixie)
-
-class moveS(actionN):
-    "move one step to the south"
-
-    def __init__(self, attributedPixie):
-        super().__init__(attributedPixie)
-
-    def __str__(self):
-        return f"moveS: pixie {self.attributedPixie}, input {self.input}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
-
-
-    def execute(self):
-        "input gets converted to a probability, then executed"
-        normed_input = math.tanh(self.input)
-        sign = np.sign(normed_input)
-
-        if random.random() < abs(normed_input):
-            yComponent = 1 * sign
-            self.attributedPixie.moveY += yComponent
-        
-        self.clearInput()
-        self.attributedPixie.worldToInhabit.queueForMove.add(self.attributedPixie)
-
-class moveE(actionN):
-    "move one step to the north"
-
-    def __init__(self, attributedPixie):
-        super().__init__(attributedPixie)
-    
-    def __str__(self):
-        return f"moveE: pixie {self.attributedPixie}, input {self.input}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
-
-
-    def execute(self):
-        "input gets converted to a probability, then executed"
-        normed_input = math.tanh(self.input)
-        sign = np.sign(normed_input)
-
-        if random.random() < abs(normed_input):
-            xComponent = 1 * sign
-            self.attributedPixie.moveX += xComponent
-
-        self.clearInput()
-        self.attributedPixie.worldToInhabit.queueForMove.add(self.attributedPixie)
-
-class moveW(actionN):
-    "move one step to the north"
-
-    def __init__(self, attributedPixie):
-        super().__init__(attributedPixie)
-
-    def __str__(self):
-        return f"moveW: pixie {self.attributedPixie}, input {self.input}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
-
-
-    def execute(self):
-        "input gets converted to a probability, then executed"
-        normed_input = math.tanh(self.input)
-        sign = np.sign(normed_input)
-
-        if random.random() < abs(normed_input):
-            xComponent = -1 * sign
-            self.attributedPixie.moveX += xComponent
-        
-        self.clearInput()
-        self.attributedPixie.worldToInhabit.queueForMove.add(self.attributedPixie)
-
-class moveB(actionN):
-    "move backwards in respect to the 'facing'-direction"
-
-    def __init__(self, attributedPixie):
-        super().__init__(attributedPixie)
-    
-    def __str__(self):
-        return f"moveB: pixie {self.attributedPixie}, input {self.input}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
-
-    def execute(self):
-        "input gets converted into a probability, then executed"
-        normed_input = math.tanh(self.input)
-        sign = np.sign(normed_input)
-
-        if random.random() < abs(normed_input):
-            facing_angle = self.attributedPixie.facing
-            moveVector = self.attributedPixie.getNormalizedDirection(facing_angle+math.pi) # turn 180 degrees 
-
-            self.attributedPixie.moveY = moveVector[0] * sign
-            self.attributedPixie.moveX = moveVector[1] * sign
-        
-        self.clearInput()
-        self.attributedPixie.worldToInhabit.queueForMove.add(self.attributedPixie)
-
-class moveF(actionN):
-    "move forward in respect to the 'facing'-direction"
-
-    def __init__(self, attributedPixie):
-        super().__init__(attributedPixie)
-    
-    def __str__(self):
-        return f"moveF: pixie {self.attributedPixie}, input {self.input}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
-
-    def execute(self):
-        "input gets converted into a probability, then executed"
-        normed_input = math.tanh(self.input)
-        sign = np.sign(normed_input)
-
-        if random.random() < abs(normed_input):
-            facing_angle = self.attributedPixie.facing
-            moveVector = self.attributedPixie.getNormalizedDirection(facing_angle) # same direction
-
-            self.attributedPixie.moveY = moveVector[0] * sign
-            self.attributedPixie.moveX = moveVector[1] * sign
-        
-        self.clearInput()
-        self.attributedPixie.worldToInhabit.queueForMove.add(self.attributedPixie)
-
-class moveR(actionN):
-    "move backwards in respect to the 'facing'-direction"
-
-    def __init__(self, attributedPixie):
-        super().__init__(attributedPixie)
-    
-    def __str__(self):
-        return f"moveR: pixie {self.attributedPixie}, input {self.input}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
-
-    def execute(self):
-        "input gets converted into a probability, then executed"
-        normed_input = math.tanh(self.input)
-        sign = np.sign(normed_input)
-
-        if random.random() < abs(normed_input):
-            facing_angle = self.attributedPixie.facing
-            moveVector = self.attributedPixie.getNormalizedDirection(facing_angle-math.pi/2) # turn 90 degrees to the left 
-
-            self.attributedPixie.moveY = moveVector[0] * sign
-            self.attributedPixie.moveX = moveVector[1] * sign
-        
-        self.clearInput()
-        self.attributedPixie.worldToInhabit.queueForMove.add(self.attributedPixie)
-
-class moveL(actionN):
-    "move backwards in respect to the 'facing'-direction"
-
-    def __init__(self, attributedPixie):
-        super().__init__(attributedPixie)
-    
-    def __str__(self):
-        return f"moveL: pixie {self.attributedPixie}, input {self.input}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
-
-    def execute(self):
-        "input gets converted into a probability, then executed"
-        normed_input = math.tanh(self.input)
-        sign = np.sign(normed_input)
-
-        if random.random() < abs(normed_input):
-            facing_angle = self.attributedPixie.facing
-            moveVector = self.attributedPixie.getNormalizedDirection(facing_angle+math.pi/2) # turn 90 degrees to the left
-
-            self.attributedPixie.moveY = moveVector[0] * sign
-            self.attributedPixie.moveX = moveVector[1] * sign
-        
-        self.clearInput()
-        self.attributedPixie.worldToInhabit.queueForMove.add(self.attributedPixie)
-
 
 action_dict = {
-    0: moveN,
-    1: moveS,
-    2: moveE,
-    3: moveW,
-    4: moveN
+    0: neurons.moveN,
+    1: neurons.moveS,
+    2: neurons.moveE,
+    3: neurons.moveW,
+    4: neurons.moveN
 } # first and last index always has to code for the same neuron!
 
+################################################
+# SELECTION CRITERIA
+
+selection_criteria = {
+    0: lambda x: selection.doNothing(x),
+    1: lambda x: selection.killRightHalf(x),
+    2: lambda x: selection.killLeftHalf(x), 
+    3: lambda x: selection.killMiddle(x)
+}
 
 ################################################
 # SIMULATOR FUNCTIONS
 
-def eachSimStep(world):
+def eachSimStep(world, gen=None):
     ""
     # execute the genome for each pixie in the world
     for pixie in world.getInhabitants():
@@ -1034,9 +700,15 @@ def eachSimStep(world):
     world.queueForMove = set()
     world.queueForKill = set()
 
+    world.updateWorld()
+
     # create a frame for the gif
     if createGIF:  
-        render.render(world)
+        if gen:
+            if (gen) % createGIFevery == 0:
+                render.render(world)
+        else: 
+            render.render(world)
 
 def spawnPixie(world, inheritedDNA=None, newHexColor=None):
     "spawn a single pixie"
@@ -1104,6 +776,7 @@ def saveMetaGenome(world):
             DNA_list = []
             sources_list = []
             sinks_list = []
+            weights_list = []
             connections_list = []
             pixieName = "placeholder"
             for neurolink in genes_list:
@@ -1111,8 +784,9 @@ def saveMetaGenome(world):
                 DNA_list.append(neurolink.DNA)
                 sources_list.append(neurolink.source)
                 sinks_list.append(neurolink.sink)
+                weights_list.append(neurolink.weight)
 
-            connections = zip(sources_list, sinks_list)
+            connections = zip(sources_list, sinks_list, weights_list)
             for i in connections:
                 connections_list.append(str(i))
             connections_str = ";".join(connections_list)
@@ -1136,16 +810,33 @@ def readMetaGenome(textfile):
 
     return metagenome
 
+def applySelectionCriteria(world):
+    ""
+    # get Function from selection_criteria dict
+    i = selectionCriterium
+    selectionFunction = selection_criteria[i]
+
+    # execute Function
+    selectionFunction(world)
+    world.updateWorld()
+
 
 def simulateGenerations(startingPopulation=None):
     "Randomly simulate as many generations as specified. Optionally provide a starting Population (metagenome)."
 
     print("simulating...")
     start_time = time.time()
+
     # first generation: 
     firstWorld = newGeneration(existingGenomes=startingPopulation)
     for i in range(numberOfSimSteps):
         eachSimStep(firstWorld)
+
+    # kill pixies that don't suffice the selection criteria
+    applySelectionCriteria(firstWorld)
+    if createGIF:
+        render.render(firstWorld)
+
     if createGIF:
         render.create_gif(filename=f"world_1.gif")
 
@@ -1154,17 +845,25 @@ def simulateGenerations(startingPopulation=None):
     for num in range(numberOfGenerations-1): # -1 because the first world already got created
         newWorld = newGeneration(oldWorld=oldWorld)
         for i in range(numberOfSimSteps):
-            eachSimStep(newWorld)
+            eachSimStep(newWorld, gen=num+2)
+
+        # kill pixies that don't suffice the selection criteria
+        applySelectionCriteria(newWorld)
         if createGIF:
-            render.create_gif(filename=f"world_{num+2}.gif")
+            if (num+2) % createGIFevery == 0:
+                render.render(newWorld)
+
+        if createGIF:
+            if (num+2) % createGIFevery == 0:
+                render.create_gif(filename=f"world_{num+2}.gif")
+
+
         oldWorld = newWorld
 
         # in the last world, save the metagenome
         if num == numberOfGenerations-2:
             if save_metagenome:
                 saveMetaGenome(newWorld)
-
-        # kill off pixies that aren't fit enough
     
     print("all done!")
     print(f"time elapsed: {time.time() - start_time} seconds")
@@ -1174,15 +873,17 @@ def simulateGenerations(startingPopulation=None):
 
 gridsize = 50
 numberOfGenes = 4
-numberOfPixies = 200
+numberOfPixies = 500
 numberOfGenerations = 100
-numberOfSimSteps = 100
+numberOfSimSteps = 15
 mutationRate = 0
 
+selectionCriterium = 1 # key for selection_criteria dict
 defaultEnergy = 0
 
-save_metagenome = False
-createGIF = False
+save_metagenome = True
+createGIF = True
+createGIFevery = 10
 
 ################################################
 # MANUAL INSTANCING
@@ -1195,6 +896,6 @@ createGIF = False
 # for i in myGenes:
 #     print(i)
 
-#simulateGenerations()
-simulateGenerations(readMetaGenome("metagenome.txt")) # a metagenome object can be provided as an argument if a previous population 
+simulateGenerations()
+#simulateGenerations(readMetaGenome("metagenome.txt")) # a metagenome object can be provided as an argument if a previous population 
 
