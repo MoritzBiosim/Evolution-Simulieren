@@ -680,7 +680,8 @@ selection_criteria = {
     0: lambda x: selection.doNothing(x),
     1: lambda x: selection.killRightHalf(x),
     2: lambda x: selection.killLeftHalf(x), 
-    3: lambda x: selection.killMiddle(x)
+    3: lambda x: selection.killMiddle(x),
+    4: lambda x: selection.killEdges(x)
 }
 
 ################################################
@@ -703,10 +704,13 @@ def eachSimStep(world, gen=None):
     world.updateWorld()
 
     # create a frame for the gif
-    if createGIF:  
+    if createGIF != "none":  
         if gen:
-            if (gen) % createGIFevery == 0:
+            if createGIF == "selected" and gen in createGIFfor:
                 render.render(world)
+            elif createGIF == "every" and (gen) % createGIFevery == 0:
+                render.render(world)
+            
         else: 
             render.render(world)
 
@@ -834,10 +838,10 @@ def simulateGenerations(startingPopulation=None):
 
     # kill pixies that don't suffice the selection criteria
     applySelectionCriteria(firstWorld)
-    if createGIF:
+    if createGIF != "none":
         render.render(firstWorld)
 
-    if createGIF:
+    if createGIF != "none":
         render.create_gif(filename=f"world_1.gif")
 
     # following generations:
@@ -849,14 +853,19 @@ def simulateGenerations(startingPopulation=None):
 
         # kill pixies that don't suffice the selection criteria
         applySelectionCriteria(newWorld)
-        if createGIF:
-            if (num+2) % createGIFevery == 0:
+        if createGIF != "none":
+            if createGIF == "every" and (num+2) % createGIFevery == 0:
+                render.render(newWorld)
+            elif createGIF == "selected" and (num+2) in createGIFfor:
                 render.render(newWorld)
 
-        if createGIF:
-            if (num+2) % createGIFevery == 0:
-                render.create_gif(filename=f"world_{num+2}.gif")
-
+        if createGIF != "none":
+            if createGIF == "every":
+                if (num+2) % createGIFevery == 0:
+                    render.create_gif(filename=f"world_{num+2}.gif")
+            elif createGIF == "selected":
+                if (num+2) in createGIFfor:
+                    render.create_gif(filename=f"world_{num+2}.gif")
 
         oldWorld = newWorld
 
@@ -871,19 +880,20 @@ def simulateGenerations(startingPopulation=None):
 ################################################
 # PARAMETERS
 
-gridsize = 50
+gridsize = 45
 numberOfGenes = 4
-numberOfPixies = 500
-numberOfGenerations = 101
-numberOfSimSteps = 15
+numberOfPixies = 400
+numberOfGenerations = 200
+numberOfSimSteps = 30
 mutationRate = 0
 
-selectionCriterium = 1 # key for selection_criteria dict
+selectionCriterium = 4 # key for selection_criteria dict
 defaultEnergy = 0
 
 save_metagenome = True
-createGIF = True
-createGIFevery = 10
+createGIF = "selected"  # "none", "every" or "selected"
+createGIFevery = 1
+createGIFfor = [1, 2, 3, 10, 20, 100, 200]
 
 ################################################
 # MANUAL INSTANCING

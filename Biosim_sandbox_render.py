@@ -54,7 +54,7 @@ def render(world, circleDiameter=30, spacing=0, show_image=False):
         image.show()
 
 def create_gif(filename="sandbox.gif"):
-    gif_frames[0].save(filename, save_all=True, append_images=gif_frames[1:],duration=400, loop=0)
+    gif_frames[0].save(filename, save_all=True, append_images=gif_frames[1:],duration=200, loop=0)
     clear_gif()
 
 def clear_gif():
