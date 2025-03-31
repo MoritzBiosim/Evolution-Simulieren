@@ -126,6 +126,79 @@ class yPosition(sensorN):
         self.output = out
         self.transferOutput()
 
+class inverseXPosition(sensorN):
+    "output of xPosition, but 1-output"
+
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+
+    def __str__(self):
+        return f"inverseXPosition: pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+
+
+    def execute(self):
+        ""
+        xPos = self.attributedPixie.yxPos[1]
+        world_width = self.attributedPixie.worldToInhabit.size
+
+        out = xPos / world_width
+        # print(f"xPosition output: {out}")
+        self.output = 1 - out
+
+        self.transferOutput()
+
+class inverseYPosition(sensorN):
+    ""
+
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+
+    def __str__(self):
+        return f"inverseYPosition: pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+
+    def execute(self):
+        ""
+        yPos = self.attributedPixie.yxPos[0]
+        world_width = self.attributedPixie.worldToInhabit.size
+
+        out = yPos / world_width
+
+        self.output = 1 - out
+        self.transferOutput()
+    
+class random(sensorN):
+    "outputs a random value between 0 and 1"
+
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+    
+    def __str__(self):
+        return f"random: pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+    
+    def execute(self):
+        ""
+        out = random.random()
+
+        self.output = out
+        self.transferOutput()
+
+class oscillator(sensorN):
+    "outputs an oscillating signal"
+
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+        self.oscillatorPhase = 0
+
+    def __str__(self):
+        return f"oscillator: pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+
+    def execute(self):
+
+        out = math.sin(self.oscillatorPhase)
+        self.oscillatorPhase + (2*math.pi / self.attributedPixie.genome.oscillatorPeriod) # every simStep the value gets added
+
+        self.output = out
+        self.transferOutput()
 
 ############# INTERNAL NEURONS
 
@@ -165,6 +238,23 @@ class InterNeuron2(internalN):
         self.clearInput()
         self.transferOutput()
 
+class InterNeuron3(internalN):
+    "run the input through a tanh function and return the value"
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+    
+    def __str__(self):
+        return f"Internal Neuron 3: pixie {self.attributedPixie}, input {self.input}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+
+    def execute(self):
+        "run the input through a tanh function and return the value"
+
+        out = math.tanh(self.input)
+
+        self.output = out
+
+        self.clearInput()
+        self.transferOutput()
 
 ############# ACTION NEURONS
 
@@ -352,3 +442,70 @@ class moveL(actionN):
         self.clearInput()
         self.attributedPixie.worldToInhabit.queueForMove.add(self.attributedPixie)
 
+class moveRandom(actionN):
+    "move in a random direction"
+
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+
+    def __str__(self):
+        return f"setOscPeriod: pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+    
+    def execute(self):
+        "input gets converted to a probability, then executed"
+        normed_input = math.tanh(self.input)
+
+        if random.random() < abs(normed_input):
+            moveVector = (random.randint(-1, 1), random.randint(-1, 1))
+
+            self.attributedPixie.moveY = moveVector[0]
+            self.attributedPixie.moveX = moveVector[1]
+        
+        self.clearInput()
+        self.attributedPixie.worldToInhabit.queueForMove.add(self.attributedPixie)
+
+class setOscPeriod(actionN):
+    "double or halve the Period of the oscillator-neuron. Max value is a period of 100 simsteps"
+
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+
+    def __str__(self):
+        return f"setOscPeriod: pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+    
+    def execute(self):
+        "inputs get converted to a probability, then executed"
+        normed_input = math.tanh(self.input)
+        sign = np.sign(normed_input)
+
+        if random.random() < abs(normed_input):
+            if self.attributedPixie.genome.oscillatorPeriod > 100:
+                self.attributedPixie.genome.oscillatorPeriod = 100
+            else:
+                self.attributedPixie.genome.oscillatorPeriod = self.attributedPixie.genome.oscillatorPeriod * 2**sign
+
+        self.clearInput()
+
+class setSearchRadius(actionN):
+    ""
+
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+    
+    def __str__(self):
+        return f"setSearchRadius: pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+
+    def execute(self):
+        "inputs get converted to a probability, then executed"
+        normed_input = math.tanh(self.input)
+        sign = np.sign(normed_input)
+
+        if random.random() < abs(normed_input):
+            if self.attributedPixie.genome.searchRadius > 100:
+                self.attributedPixie.genome.searchRadius = 100
+            elif self.attributedPixie.genome.searchRadius < 0:
+                self.attributedPixie.genome.searchRadius = 0
+            else:
+                self.attributedPixie.genome.searchRadius +=  1*sign
+
+        self.clearInput()

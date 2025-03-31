@@ -355,9 +355,12 @@ class genome():
         self.sourceNeurons = [] # contains all source neurons
         self.sinkNeurons = [] # contains all sink neurons
         
-        self.sensorToInternal = [] # obsolete
-        self.internalToInternal = [] # obsolete
-        self.sensor_InternalToAction = [] # obsolete
+        # self.sensorToInternal = [] # obsolete
+        # self.internalToInternal = [] # obsolete
+        # self.sensor_InternalToAction = [] # obsolete
+
+        self.oscillatorPeriod = 8 # number of simsteps in one oscillator cycle
+        self.searchRadius = 5 # searchradius used by functions like searchNeighbourhood
 
         # instantiate new Neurolink objects
         if self.inheritedDNA: # instantiate new neurolink objects from old dna
