@@ -166,7 +166,7 @@ class inverseYPosition(sensorN):
         self.output = 1 - out
         self.transferOutput()
     
-class random(sensorN):
+class randomOutput(sensorN):
     "outputs a random value between 0 and 1"
 
     def __init__(self, attributedPixie):

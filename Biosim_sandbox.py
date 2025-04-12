@@ -766,9 +766,11 @@ def mutateGenes(gene_list):
     "iterate through the DNA bits and change it with a small chance"
     
     for gene in gene_list:
-        for i in range(len(gene)):
-            if random.random() < mutationRate:
-                gene[i] = 1 if gene[i] == 0 else 0
+        # for i in range(len(gene)):
+        #     if random.random() < mutationRate:
+        #         gene[i] = "1" if gene[i] == "0" else "0"
+        #         gene = "".join(["1" if bit == "0" else "0" for bit in gene if random.random() < mutationRate])
+        gene = "".join(["1" if bit == "0" and random.random() < mutationRate else "0" if bit == "1" and random.random() < mutationRate else bit for bit in gene])
     return gene_list
 
 def saveMetaGenome(world):
@@ -883,12 +885,12 @@ def simulateGenerations(startingPopulation=None):
 ################################################
 # PARAMETERS
 
-gridsize = 45
-numberOfGenes = 4
-numberOfPixies = 400
-numberOfGenerations = 200
-numberOfSimSteps = 30
-mutationRate = 0
+gridsize = 50
+numberOfGenes = 8
+numberOfPixies = 500
+numberOfGenerations = 500
+numberOfSimSteps = 50
+mutationRate = 0.05
 
 selectionCriterium = 4 # key for selection_criteria dict
 defaultEnergy = 0
@@ -896,7 +898,7 @@ defaultEnergy = 0
 save_metagenome = True
 createGIF = "selected"  # "none", "every" or "selected"
 createGIFevery = 1
-createGIFfor = [1, 2, 3, 10, 20, 100, 200]
+createGIFfor = [1, 2, 3, 10, 20, 100, 200, 300, 400, 500]
 
 ################################################
 # MANUAL INSTANCING
