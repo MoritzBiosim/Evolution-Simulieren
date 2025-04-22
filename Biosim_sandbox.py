@@ -848,6 +848,9 @@ def simulateGenerations(startingPopulation=None):
     print("simulating...")
     start_time = time.time()
 
+    if gridsize**2 < numberOfPixies:
+        raise OverflowError("too many pixies for the grid!")
+
     # first generation: 
     firstWorld = newGeneration(existingGenomes=startingPopulation)
     calculateDiversity(firstWorld)
