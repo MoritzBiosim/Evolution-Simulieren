@@ -5,6 +5,7 @@ import time
 import Biosim_sandbox_render as render
 import Biosim_sandbox_neurons as neurons
 import Biosim_sandbox_selection as selection
+import Biosim_sandbox_environment as environment
 
 
 class world():
@@ -179,7 +180,7 @@ class pixie(object):
         """return the direction of a referenced object OR vector OR angle as a vector tuple by checking 
         if the calculated angle is within 22.5° of any cardinal direction"""
 
-        if not vector and not object and not angle:
+        if vector is None and object is None and angle is None:
             raise ValueError("neither an object, vector or angle was provided")
         
         if vector:
@@ -189,6 +190,10 @@ class pixie(object):
 
         if angle < 0:
             angle = angle + 2*math.pi
+
+        if angle > 2*math.pi:
+            k = angle // (2*math.pi)
+            angle = angle - k*2*math.pi
 
         if abs(0 - angle) < (1/8) * math.pi or abs(2*math.pi - angle) < (1/8) * math.pi: # 0° and 360°
             direction = (0,1)
@@ -212,6 +217,7 @@ class pixie(object):
 
     def searchNeighbourhood(self, searchRadius=5):
         "scans the surrounding grid and returns a list of all objects within the search radius"
+        "this includes pixies occupying the same gridspace as the searching pixie!"
 
         world = self.worldToInhabit # this makes providing the argument "world" obsolete
 
@@ -306,22 +312,22 @@ class pixie(object):
         return relAngle
  
 # environment classes 
-class stone(object):
-    ""
+# class stone(object):
+#     ""
 
-    def __init__(self, worldToInhabit, name, yxPos, shape="square"):
-        super().__init__(worldToInhabit, name, yxPos)
-        self.shape = shape
-        self.color = "5d5555" # gray
-        worldToInhabit.environment.append(self)
+#     def __init__(self, worldToInhabit, name, yxPos, shape="square"):
+#         super().__init__(worldToInhabit, name, yxPos)
+#         self.shape = shape
+#         self.color = "5d5555" # gray
+#         worldToInhabit.environment.append(self)
 
-class food(object):
-    ""
-    def __init__(self, worldToInhabit, name, yxPos, shape="food"):
-        super().__init__(worldToInhabit, name, yxPos)
-        self.shape = shape
-        self.color = "FFFF00" # yellow
-        worldToInhabit.environment.append(self)
+# class food(object):
+#     ""
+#     def __init__(self, worldToInhabit, name, yxPos, shape="food"):
+#         super().__init__(worldToInhabit, name, yxPos)
+#         self.shape = shape
+#         self.color = "FFFF00" # yellow
+#         worldToInhabit.environment.append(self)
 
 ################################################
 # GENOME CLASS
@@ -452,7 +458,7 @@ class genome():
                     #print("removed", neuron)
                     try:
                         self.allNeurons.remove(neuron)
-                    except ValueError:
+                    except KeyError:
                         pass
                     selfLinks_to_remove = [neurolink for neurolink in self.genes if neurolink.sink == neuron.__class__]
                     if selfLinks_to_remove:
@@ -465,7 +471,7 @@ class genome():
                     # print("removed", neuron)
                     try:
                         self.allNeurons.remove(neuron)
-                    except ValueError:
+                    except KeyError:
                         pass
                     links_to_remove = [neurolink for neurolink in self.genes if neurolink.source == neuron.__class__]
                     if links_to_remove:
@@ -479,7 +485,7 @@ class genome():
                     try:
                         self.sourceNeurons.remove(neuron)
                         self.allNeurons.remove(neuron)
-                    except ValueError:
+                    except KeyError:
                         pass
                     selfLinks_to_remove = [neurolink for neurolink in self.genes if neurolink.source == neuron.__class__ or neurolink.sink == neuron.__class__]
                     if selfLinks_to_remove:
@@ -494,7 +500,7 @@ class genome():
                 # print("removed", neuron)
                 try:
                     self.allNeurons.remove(neuron)
-                except ValueError:
+                except KeyError:
                     pass
         # also check if there are any sinks left with numInputs 0
         for neuron in self.sinkNeurons:
@@ -503,7 +509,7 @@ class genome():
                 # print("removed", neuron)
                 try:
                     self.allNeurons.remove(neuron)
-                except ValueError:
+                except KeyError:
                     pass
         self.calculateConnectivity()
 
@@ -659,13 +665,19 @@ Neuron classes are stored in neuron_dicts so they can be referenced by Neurolink
 sensor_dict = {
     0: neurons.xPosition,
     1: neurons.yPosition,
-    2: neurons.xPosition
+    2: neurons.inverseXPosition,
+    3: neurons.inverseYPosition,
+    4: neurons.randomOutput, 
+    5: neurons.oscillator,
+    6: neurons.popDensityFwd,
+    7: neurons.xPosition
 } # first and last index always has to code for the same neuron!
 
 internal_dict = {
     0: neurons.InterNeuron1,
     1: neurons.InterNeuron2,
-    2: neurons.InterNeuron1
+    2: neurons.InterNeuron3,
+    3: neurons.InterNeuron1
 } # first and last index always has to code for the same neuron!
 
 action_dict = {
@@ -673,6 +685,13 @@ action_dict = {
     1: neurons.moveS,
     2: neurons.moveE,
     3: neurons.moveW,
+    4: neurons.moveB,
+    5: neurons.moveF,
+    6: neurons.moveL,
+    7: neurons.moveR,
+    8: neurons.moveRandom,
+    9: neurons.setOscPeriod,
+    10: neurons.setSearchRadius,
     4: neurons.moveN
 } # first and last index always has to code for the same neuron!
 
@@ -685,6 +704,15 @@ selection_criteria = {
     2: lambda x: selection.killLeftHalf(x), 
     3: lambda x: selection.killMiddle(x),
     4: lambda x: selection.killEdges(x)
+}
+
+################################################
+# ENVIRONMENT
+
+environment_dict = {
+    0: lambda x: environment.noEnvironment(x),
+    1: lambda x: environment.barrierMiddleVertical(x),
+    2: lambda x: environment.sparseFood(x)
 }
 
 ################################################
@@ -740,6 +768,8 @@ def newGeneration(oldWorld=None, existingGenomes=None):
     if oldWorld: # inherit genes from the predecessing generation
         oldPopulation = oldWorld.inhabitants
         newWorld = world(size=gridsize)
+        #create environment
+        environment_dict[environment_key](newWorld)
 
         for i in range(numberOfPixies):
             predecessor = random.choice(oldPopulation)
@@ -753,6 +783,9 @@ def newGeneration(oldWorld=None, existingGenomes=None):
 
     else: # inherit genes from predetermined Populations
         newWorld = world(size=gridsize)
+        # create environment
+        environment_dict[environment_key](newWorld)
+
         if existingGenomes:
             for genome in existingGenomes:
                 spawnPixie(newWorld, inheritedDNA=genome)
@@ -911,36 +944,31 @@ def simulateGenerations(startingPopulation=None):
 ################################################
 # PARAMETERS
 
+# world parameters
 gridsize = 20
 numberOfGenes = 8
-numberOfPixies = 200
+numberOfPixies = 100
 numberOfGenerations = 100
-numberOfSimSteps = 50
-mutationRate = 0.005
-
+numberOfSimSteps = 100
 selectionCriterium = 1 # key for selection_criteria dict
+environment_key = 1 # key for environment_dict dict
+
+# pixie parameters
+mutationRate = 0.005
 defaultEnergy = 0
 
+# analytics
 save_metagenome = True
 calc_survivalRate = True
 calc_diversity = True
-createGIF = "none"  # "none", "every" or "selected"
+createGIF = "selected"  # "none", "every" or "selected"
 createGIFevery = 1
 createGIFfor = [1, 2, 3, 10, 20, 100, 200, 300, 400, 500]
 
 survivalRateOverTime = [] # list containing survivalrate for each gen
 diversityOverTime = [] 
 
-################################################
-# MANUAL INSTANCING
 
-# grid0 = world(size=10)
-
-# myPixie = pixie(grid0, "myPixie1", (3, 4))
-# myGenome = myPixie.getGenome()
-# myGenes = myGenome.getGenes()
-# for i in myGenes:
-#     print(i)
 
 simulateGenerations()
 #simulateGenerations(readMetaGenome("metagenome.txt")) # a metagenome object can be provided as an argument if a previous population 

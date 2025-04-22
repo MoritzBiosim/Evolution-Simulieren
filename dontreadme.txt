@@ -188,7 +188,7 @@ ToDo:
 
 Testen:
 - Überprüfen ob Internal Neurons wirklich funktionieren: Speichern sie ihre alten Outputs als Inputs und verwenden sie im nächsten Simstep wieder?
-- Funktioniert mutateGenes?
+- Funktioniert mutateGenes? ja
 
 
 Bei D. Miller gibt es auch Internal Neurons, die ohne Input funktionieren (obwohl er im Video sagt, dass alles was sie machen ist Inputs zu summieren). Man könnte also überlegen ob man ihnen Default Output werte gibt die sie raushauen wenn sie keinen Input bekommen. Dafür müsste man auch deaktivieren dass I. Neurons entfernt werden wenn sie keine Input Connections haben. Oder man lässts

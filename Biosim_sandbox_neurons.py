@@ -219,9 +219,10 @@ class popDensityFwd(sensorN):
         neighbourhood = self.attributedPixie.getAllEuclidianDistances()
         for tuple in neighbourhood:
             dist = tuple[1]
-            relAngle = tuple[0].getRelativeAngle
-            factor = math.cos(relAngle - viewAxis)
-            cache.append(1 / dist * factor)
+            if dist > 0:
+                relAngle = self.attributedPixie.getRelativeAngle(otherObject=tuple[0])
+                factor = math.cos(relAngle - viewAxis)
+                cache.append(1 / dist * factor)
         
         self.output = sum(cache) / (1.9*(self.attributedPixie.genome.searchRadius-0.5)) # norming factor
         self.transferOutput()
@@ -389,7 +390,7 @@ class moveB(actionN):
 
         if random.random() < abs(normed_input):
             facing_angle = self.attributedPixie.facing
-            moveVector = self.attributedPixie.getNormalizedDirection(facing_angle+math.pi) # turn 180 degrees 
+            moveVector = self.attributedPixie.getNormalizedDirection(angle=facing_angle+math.pi) # turn 180 degrees 
 
             self.attributedPixie.moveY = moveVector[0] * sign
             self.attributedPixie.moveX = moveVector[1] * sign
@@ -413,7 +414,7 @@ class moveF(actionN):
 
         if random.random() < abs(normed_input):
             facing_angle = self.attributedPixie.facing
-            moveVector = self.attributedPixie.getNormalizedDirection(facing_angle) # same direction
+            moveVector = self.attributedPixie.getNormalizedDirection(angle=facing_angle) # same direction
 
             self.attributedPixie.moveY = moveVector[0] * sign
             self.attributedPixie.moveX = moveVector[1] * sign
@@ -437,7 +438,7 @@ class moveR(actionN):
 
         if random.random() < abs(normed_input):
             facing_angle = self.attributedPixie.facing
-            moveVector = self.attributedPixie.getNormalizedDirection(facing_angle-math.pi/2) # turn 90 degrees to the left 
+            moveVector = self.attributedPixie.getNormalizedDirection(angle=facing_angle-math.pi/2) # turn 90 degrees to the left 
 
             self.attributedPixie.moveY = moveVector[0] * sign
             self.attributedPixie.moveX = moveVector[1] * sign
@@ -461,7 +462,7 @@ class moveL(actionN):
 
         if random.random() < abs(normed_input):
             facing_angle = self.attributedPixie.facing
-            moveVector = self.attributedPixie.getNormalizedDirection(facing_angle+math.pi/2) # turn 90 degrees to the left
+            moveVector = self.attributedPixie.getNormalizedDirection(angle=facing_angle+math.pi/2) # turn 90 degrees to the left
 
             self.attributedPixie.moveY = moveVector[0] * sign
             self.attributedPixie.moveX = moveVector[1] * sign
