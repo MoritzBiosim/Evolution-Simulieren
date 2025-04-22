@@ -200,6 +200,33 @@ class oscillator(sensorN):
         self.output = out
         self.transferOutput()
 
+class popDensityFwd(sensorN):
+    "senses the population density around the pixie, with highest output directly in front"
+
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+    
+    def __str__(self):
+        return f"popDensityFwd: pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+    
+    def execute(self): 
+        # get the view axis, compute the denstity 'quantum' for each pixie and sum it up
+        # divide the sum by twice the search-Radius to get a value between 0 and 1
+
+        cache = []
+
+        viewAxis = self.attributedPixie.facing
+        neighbourhood = self.attributedPixie.getAllEuclidianDistances()
+        for tuple in neighbourhood:
+            dist = tuple[1]
+            relAngle = tuple[0].getRelativeAngle
+            factor = math.cos(relAngle - viewAxis)
+            cache.append(1 / dist * factor)
+        
+        self.output = sum(cache) / (1.9*(self.attributedPixie.genome.searchRadius-0.5)) # norming factor
+        self.transferOutput()
+
+
 ############# INTERNAL NEURONS
 
 class InterNeuron1(internalN):
