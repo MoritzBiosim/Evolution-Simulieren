@@ -829,6 +829,18 @@ def applySelectionCriteria(world):
     selectionFunction(world)
     world.updateWorld()
 
+def calculateDiversity(world):
+    if calc_diversity:
+            unique_genomes = set()
+            for pixie in world.inhabitants: # add the DNA of every gene
+                unique_genomes.add(tuple(x.DNA for x in pixie.genome.genes))
+            diversity = len(unique_genomes) / numberOfPixies
+            diversityOverTime.append(diversity)
+
+def calculateSurvivalRate(world):
+    if calc_survivalRate:
+        survivalRate = len(world.inhabitants) / numberOfPixies
+        survivalRateOverTime.append(survivalRate)
 
 def simulateGenerations(startingPopulation=None):
     "Randomly simulate as many generations as specified. Optionally provide a starting Population (metagenome)."
@@ -838,6 +850,7 @@ def simulateGenerations(startingPopulation=None):
 
     # first generation: 
     firstWorld = newGeneration(existingGenomes=startingPopulation)
+    calculateDiversity(firstWorld)
     for i in range(numberOfSimSteps):
         eachSimStep(firstWorld)
 
@@ -845,14 +858,16 @@ def simulateGenerations(startingPopulation=None):
     applySelectionCriteria(firstWorld)
     if createGIF != "none":
         render.render(firstWorld)
-
-    if createGIF != "none":
         render.create_gif(filename=f"world_1.gif")
+    
+    calculateSurvivalRate(firstWorld)
 
     # following generations:
     oldWorld = firstWorld
     for num in range(numberOfGenerations-1): # -1 because the first world already got created
         newWorld = newGeneration(oldWorld=oldWorld)
+        calculateDiversity(newWorld)
+
         for i in range(numberOfSimSteps):
             eachSimStep(newWorld, gen=num+2)
 
@@ -864,6 +879,10 @@ def simulateGenerations(startingPopulation=None):
             elif createGIF == "selected" and (num+2) in createGIFfor:
                 render.render(newWorld)
 
+        # calculate the survival rate
+        calculateSurvivalRate(newWorld)
+
+        # create a GIF
         if createGIF != "none":
             if createGIF == "every":
                 if (num+2) % createGIFevery == 0:
@@ -882,23 +901,32 @@ def simulateGenerations(startingPopulation=None):
     print("all done!")
     print(f"time elapsed: {time.time() - start_time} seconds")
 
+    if calc_survivalRate or calc_diversity:
+        render.calcSurvivalAndDiversity(list_survival=survivalRateOverTime, list_diversity=diversityOverTime)
+
+
 ################################################
 # PARAMETERS
 
-gridsize = 50
+gridsize = 20
 numberOfGenes = 8
-numberOfPixies = 500
-numberOfGenerations = 500
+numberOfPixies = 200
+numberOfGenerations = 100
 numberOfSimSteps = 50
-mutationRate = 0.05
+mutationRate = 0.005
 
-selectionCriterium = 4 # key for selection_criteria dict
+selectionCriterium = 1 # key for selection_criteria dict
 defaultEnergy = 0
 
 save_metagenome = True
-createGIF = "selected"  # "none", "every" or "selected"
+calc_survivalRate = True
+calc_diversity = True
+createGIF = "none"  # "none", "every" or "selected"
 createGIFevery = 1
 createGIFfor = [1, 2, 3, 10, 20, 100, 200, 300, 400, 500]
+
+survivalRateOverTime = [] # list containing survivalrate for each gen
+diversityOverTime = [] 
 
 ################################################
 # MANUAL INSTANCING

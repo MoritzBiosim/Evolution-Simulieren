@@ -2,6 +2,7 @@ import numpy as np
 import math
 from PIL import Image, ImageDraw
 import gc
+import matplotlib.pyplot as plt
 
 gif_frames = []
 # aufzurufen als render.render(grid0)
@@ -61,3 +62,16 @@ def clear_gif():
     "clears the gif_frames list"
     gif_frames.clear()
     gc.collect
+
+def calcSurvivalAndDiversity(list_survival=None, list_diversity=None):
+    if list_survival:
+        plt.plot(list_survival, label="survival rate")
+        # print(list_survival)
+    if list_diversity:
+        plt.plot(list_diversity, label="diversity")
+    
+    plt.title("survival rates and diversity in the population over time")
+    plt.xlabel("generation")
+    plt.ylim(0,1)
+    plt.legend()
+    plt.show()
