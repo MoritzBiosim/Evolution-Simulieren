@@ -1,0 +1,58 @@
+world Funktionen:
+
+- __str__(self) --> return grid
+- getInhabitants --> return inhabitants liste
+- getEnvironment --> return Environment liste
+- updateWorld --> reload the grid
+
+object Funktionen:
+
+- __str__(self) --> return Name und xy-Pos
+- getPosition --> return xy-Pos von anderem Objekt (oder sich selbst)
+
+pixie-Funktionen:
+
+(-getEnergy --> return Energy variable)
+- getGenome --> return Genome Objekt
+- createGenome --> erstellt random Genom (siehe Genome class)
+- executeGenome --> führt executeGenes-Funktion aus (siehe Genome class)
+
+- walkTowards --> nutzt die getRelativeVector und getDirection (umbenennen!!) Funktion um auf ein anderes Objekt hinzuzugehen
+- move --> "move along a provided Vector, but only if the new box is in Bounds and empty"
+- moveRandom --> gibt einen random vektor aus, entlang dem sich bewegt wird (move)
+- getDirection --> nimmt ein Objekt oder einen Vektor als Input und gibt einen normalisierten Vektor in eine Himmelsrichtung aus
+- searchNeighbourhood --> sucht alle Objekte in einem bestimmten Suchradius und gibt sie als Liste aus
+- getAllEuclidianDistances --> rechnet für alle Objekte in searchNeighbourhood die Entfernung aus und speichert sie als Tupel in einer Liste
+- getNearest --> gibt das Objekt mit der kleinsten Entfernung aus getAllEuclidianDistances aus
+- getNearestPixie --> wie getNearest, aber nur wenn das Objekt in der inhabitants-Liste ist
+- getEuclidianDistance --> gibt die Entfernung zwischen sich selbst und dem referenzierten Objekt aus
+- getRelativeVector --> gibt einen zweidimensionalen Tupel (Vektor) von sich selbst zum referenzierten Objekt aus
+- getRelativeAngle --> gibt den absoluten Winkel zum anderen Objekt in Radiant (-pi/pi) an, wobei von rechts gestartet wird
+- moveToNearestPixie --> nutzt getNearestPixie und walkTowards
+
+Stone(Pixie) und Food(pixie) und Prey(pixie) Funktionen:
+
+nix
+
+predator Funktionen (evtl. interessant für Kill-Funktion):
+
+- getNearestPrey --> wie getNearestPixie, aber nur wenn Objekt in der Prey liste ist
+- eatPrey --> löscht ein Pixie aus der inhabitants-Liste und erhöht eigene Energy
+- predate --> behaviour loop: moveRandom wenn kein Prey in der Nähe, sonst walkTowards Prey und wenn nah genug eatPrey
+
+Genome Funktionen:
+
+- __init__ --> eine bestimmte Anzahl an Genen wird instanziert und der genes-Liste hinzugefügt
+- getGenes --> return alle genes aus der genes Liste
+- executeGenes --> führt executeFunctionality für jedes gen in genes aus (siehe gene class)
+
+Gene Funktionen:
+
+- __init__ --> der functionality wird ein random gen aus der listOfFunctions zugeordnet, der expressionprobability ein float zwischen 0 und 1
+- executeFunctionality --> mit einer gewissen expressionProbability wird die functionality ausgeführt
+
+
+generelle Funktionen:
+- spawnPixies
+- simulate
+- render.render()

@@ -1,10 +1,12 @@
 import numpy as np
+import math
 from PIL import Image, ImageDraw
 import gc
+import matplotlib.pyplot as plt
 
 gif_frames = []
 # aufzurufen als render.render(grid0)
-def render(world, circleDiameter=30, spacing=0):
+def render(world, circleDiameter=30, spacing=0, show_image=False):
 
     matrixSize = np.size(world.grid, 0)
     cellSize = circleDiameter + spacing
@@ -37,15 +39,39 @@ def render(world, circleDiameter=30, spacing=0):
                 draw.polygon(((top_left[0] + cellSize/2, top_left[1] + cellSize/10), (bottom_right[0],bottom_right[1]), (bottom_right[0] - cellSize, bottom_right[1])), fill=rgb_color, outline="black")                
                 #sticker = Image.open("flower30x30.jpg")
                 #image.paste(sticker, (top_left[0], top_left[1]))
+            
+            # if facing, calculate position of facing-point
+            if hasattr(object, "facing"):
+                facing_y = math.sin(object.facing) * (circleDiameter/2)
+                facing_x = math.cos(object.facing) * (circleDiameter/2)
+                x_point = object.yxPos[1] * cellSize + spacing +15 + facing_x
+                y_point = object.yxPos[0] * cellSize + spacing +15 + facing_y
+
+                draw.circle(xy=(x_point, y_point), radius=4, fill=rgb_color)
        
         
     gif_frames.append(image)
-    #image.show()
+    if show_image:
+        image.show()
 
-def create_gif():
-    gif_frames[0].save("BS_oop3.gif", save_all=True, append_images=gif_frames[1:],duration=400, loop=0)
+def create_gif(filename="sandbox.gif"):
+    gif_frames[0].save(filename, save_all=True, append_images=gif_frames[1:],duration=200, loop=0)
+    clear_gif()
 
 def clear_gif():
     "clears the gif_frames list"
     gif_frames.clear()
     gc.collect
+
+def calcSurvivalAndDiversity(list_survival=None, list_diversity=None):
+    if list_survival:
+        plt.plot(list_survival, label="survival rate")
+        # print(list_survival)
+    if list_diversity:
+        plt.plot(list_diversity, label="diversity")
+    
+    plt.title("survival rates and diversity in the population over time")
+    plt.xlabel("generation")
+    plt.ylim(0,1)
+    plt.legend()
+    plt.show()
