@@ -310,6 +310,20 @@ class pixie(object):
             relAngle += 2*math.pi # angle now runs counterclockwise starting east
 
         return relAngle
+    
+    def searchProximateField(self):
+        "returns any objects located in the next field in FACING DIRECTION"
+        viewAxis = self.facing
+        direction = self.getNormalizedDirection(angle=viewAxis)
+        proximateField = (self.yxPos[0]+direction[0], self.yxPos[1]+direction[1])
+        gridSize = self.worldToInhabit.size
+       
+        # boundary check
+        if not (0 <= proximateField[0] < gridSize and 0 <= proximateField[1] < gridSize):
+            return None  # Out of bounds, return None
+        else:
+            proximateObject = self.worldToInhabit.grid[proximateField]
+        return proximateObject            
  
 # environment classes 
 # class stone(object):
@@ -945,10 +959,10 @@ def simulateGenerations(startingPopulation=None):
 # PARAMETERS
 
 # world parameters
-gridsize = 54
+gridsize = 20
 numberOfGenes = 8
-numberOfPixies = 1000
-numberOfGenerations = 150
+numberOfPixies = 100
+numberOfGenerations = 100
 numberOfSimSteps = 100
 selectionCriterium = 1 # key for selection_criteria dict
 environment_key = 1 # key for environment_dict dict
@@ -958,7 +972,7 @@ mutationRate = 0.005
 defaultEnergy = 0
 
 # analytics
-save_metagenome = True
+save_metagenome = False
 calc_survivalRate = True
 calc_diversity = True
 createGIF = "selected"  # "none", "every" or "selected"

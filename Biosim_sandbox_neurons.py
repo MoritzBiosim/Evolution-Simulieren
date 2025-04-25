@@ -2,7 +2,7 @@
 import math
 import numpy as np
 import random
-
+import Biosim_sandbox_environment as environment
 
 
 # Superclasses for the different Neurons
@@ -226,6 +226,42 @@ class popDensityFwd(sensorN):
         
         self.output = sum(cache) / (1.9*(self.attributedPixie.genome.searchRadius-0.5)) # norming factor
         self.transferOutput()
+
+class blockageFwd(sensorN):
+    "checks if the field in facing direction is blocked and returns 1 if it is, 0 otherwise"
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+
+    def __str__(self):
+        return f"blockageFwd: if the proximate field is blocked, 1, otherwise 0: {self.output}"
+
+    def execute(self):
+        ""
+        proximateObject = self.attributedPixie.searchProximateField()
+        if proximateObject == None:
+            self.output = 0
+        else:
+            self.output = 1
+        self.transferOutput()
+    
+
+class barrierFwd(sensorN):
+    "checks for a barrier in facing direction and returns 1 if there is one, 0 otherwise"
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+
+    def __str__(self):
+        return f"barrierFwd: if the proximate field contains a barrier, 1, otherwise 0: {self.output}"
+
+    def execute(self):
+        ""
+        proximateObject = self.attributedPixie.searchProximateField()
+        if isinstance(proximateObject, environment.stone):
+            self.output = 1
+        else:
+            self.output = 0
+        self.transferOutput()
+    
 
 
 ############# INTERNAL NEURONS
