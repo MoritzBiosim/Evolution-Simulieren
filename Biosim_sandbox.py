@@ -785,15 +785,36 @@ def newGeneration(oldWorld=None, existingGenomes=None):
         #create environment
         environment_dict[environment_key](newWorld)
 
-        for i in range(numberOfPixies):
-            predecessor = random.choice(oldPopulation)
+        if geneticDrift == True:
+            for i in range(numberOfPixies):
+                predecessor = random.choice(oldPopulation)
 
-            inheritedGenes = [neurolink.DNA for neurolink in predecessor.genome.genes]
-            possiblyMutatedDNA = mutateGenes(gene_list=inheritedGenes)
+                inheritedGenes = [neurolink.DNA for neurolink in predecessor.genome.genes]
+                possiblyMutatedDNA = mutateGenes(gene_list=inheritedGenes)
 
-            inheritedColor = predecessor.color # this doesn't allow for color mutations
+                inheritedColor = predecessor.color # this doesn't allow for color mutations
 
-            spawnPixie(newWorld, inheritedDNA=possiblyMutatedDNA, newHexColor=inheritedColor)
+                spawnPixie(newWorld, inheritedDNA=possiblyMutatedDNA, newHexColor=inheritedColor)
+        else:
+            for predecessor in oldPopulation:
+                "each surviving pixie produces one offspring"
+                inheritedGenes = [neurolink.DNA for neurolink in predecessor.genome.genes]
+                possiblyMutatedDNA = mutateGenes(gene_list=inheritedGenes)
+
+                inheritedColor = predecessor.color # this doesn't allow for color mutations
+
+                spawnPixie(newWorld, inheritedDNA=possiblyMutatedDNA, newHexColor=inheritedColor)
+
+            while len(newWorld.inhabitants) < numberOfPixies:
+                "fill up the rest with randomly chosen pixies"
+                predecessor = random.choice(oldPopulation)
+
+                inheritedGenes = [neurolink.DNA for neurolink in predecessor.genome.genes]
+                possiblyMutatedDNA = mutateGenes(gene_list=inheritedGenes)
+
+                inheritedColor = predecessor.color # this doesn't allow for color mutations
+
+                spawnPixie(newWorld, inheritedDNA=possiblyMutatedDNA, newHexColor=inheritedColor)
 
     else: # inherit genes from predetermined Populations
         newWorld = world(size=gridsize)
@@ -966,6 +987,8 @@ numberOfGenerations = 100
 numberOfSimSteps = 100
 selectionCriterium = 1 # key for selection_criteria dict
 environment_key = 1 # key for environment_dict dict
+
+geneticDrift = False # if False, then each surviving pixie automatically produces at least one offspring
 
 # pixie parameters
 mutationRate = 0.005
