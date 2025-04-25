@@ -945,10 +945,10 @@ def simulateGenerations(startingPopulation=None):
 # PARAMETERS
 
 # world parameters
-gridsize = 20
+gridsize = 54
 numberOfGenes = 8
-numberOfPixies = 100
-numberOfGenerations = 100
+numberOfPixies = 1000
+numberOfGenerations = 150
 numberOfSimSteps = 100
 selectionCriterium = 1 # key for selection_criteria dict
 environment_key = 1 # key for environment_dict dict
@@ -963,7 +963,7 @@ calc_survivalRate = True
 calc_diversity = True
 createGIF = "selected"  # "none", "every" or "selected"
 createGIFevery = 1
-createGIFfor = [1, 2, 3, 10, 20, 100, 200, 300, 400, 500]
+createGIFfor = [numberOfGenerations, 1, 2, 3, 10, 20, 100, 200, 300, 400, 500]
 
 survivalRateOverTime = [] # list containing survivalrate for each gen
 diversityOverTime = [] 
