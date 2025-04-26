@@ -261,7 +261,7 @@ class barrierFwd(sensorN):
             self.output = 0
         self.transferOutput()
 
-class pixieFwd(sensorN):
+class nextPixie(sensorN):
     "returns the inverse of the distance of the nearest Pixie in facing direction"
     def __init__(self, attributedPixie):
         super().__init__(attributedPixie)
@@ -278,6 +278,27 @@ class pixieFwd(sensorN):
         else:
             nearestFwdPixie = allFwdPixies[0]
             d = self.attributedPixie.getEuclidianDistance(nearestFwdPixie)
+            self.output = 1/d
+        
+        self.transferOutput()
+    
+class nextObject(sensorN):
+    "returns the inverse of the distance of the nearest Object in facing direction"
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+
+    def __str__(self):
+        return f"nextObject: pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+
+    def execute(self):
+        ""
+        distances = []
+        allFwdObjects = self.attributedPixie.getFwdObjects()
+        if not allFwdObjects:
+            self.output = 0
+        else:
+            nearestFwdObject = allFwdObjects[0]
+            d = self.attributedPixie.getEuclidianDistance(nearestFwdObject)
             self.output = 1/d
         
         self.transferOutput()
@@ -625,3 +646,31 @@ class setSearchRadius(actionN):
                 self.attributedPixie.genome.searchRadius +=  1*sign
 
         self.clearInput()
+
+
+class kill(actionN):
+    "if the nearest pixie is within killing distance, it is added to the queueForKill"
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+    
+    def __str__(self):
+        return f"kill: pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+
+    def execute(self):
+        "input gets converted into a probability, then executed"
+        normed_input = math.tanh(self.input)
+
+        if random.random() < abs(normed_input):
+
+            potentialVictim = self.attributedPixie.getNearestPixie()
+
+            if potentialVictim is not None:
+                distance = self.attributedPixie.getEuclidianDistance(potentialVictim)
+                if distance <= self.attributedPixie.genome.killRadius:
+                    self.attributedPixie.worldToInhabit.queueForKill.add(potentialVictim)
+                else:
+                    pass
+        
+        self.clearInput()
+            
+            

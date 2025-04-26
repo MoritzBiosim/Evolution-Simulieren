@@ -422,7 +422,7 @@ class genome():
 
         self.oscillatorPeriod = 8 # number of simsteps in one oscillator cycle
         self.searchRadius = 5 # searchradius used by functions like searchNeighbourhood
-
+        self.killRadius = 2 #used by class kill()
         # instantiate new Neurolink objects
         if self.inheritedDNA: # instantiate new neurolink objects from old dna
             for gene in self.inheritedDNA:
@@ -783,7 +783,8 @@ def eachSimStep(world, gen=None):
     for pixie in world.queueForMove:
         pixie.executeMove()
     for pixie in world.queueForKill:
-        ""
+        world.inhabitants.remove(pixie)
+        
     world.queueForMove = set()
     world.queueForKill = set()
 
