@@ -215,11 +215,12 @@ class pixie(object):
         return direction
 
 
-    def searchNeighbourhood(self, searchRadius=5):
+    def searchNeighbourhood(self):
         "scans the surrounding grid and returns a list of all objects within the search radius"
         "this includes pixies occupying the same gridspace as the searching pixie!"
 
         world = self.worldToInhabit # this makes providing the argument "world" obsolete
+        searchRadius = int(self.genome.searchRadius) #consistency??
 
         foundObjects = []
         gridSize = np.size(world.grid, 0) # edge length of the grid (only works for square grids)
@@ -273,8 +274,7 @@ class pixie(object):
             nearest = min(neighbouring_pixies, key=lambda x: x[1])
             return nearest[0]
         else:
-            print("mäp")
-            pass
+            return None
 
     ## scanning neighbourhood for a specific, referenced object
 
@@ -323,7 +323,48 @@ class pixie(object):
             return None  # Out of bounds, return None
         else:
             proximateObject = self.worldToInhabit.grid[proximateField]
-        return proximateObject            
+        return proximateObject    
+
+    def getFwdObjects(self):
+        "returns a list of all objects in viewAxis within searchRadius"
+        viewAxis = self.facing
+        direction = self.getNormalizedDirection(angle=viewAxis)
+        gridSize = self.worldToInhabit.size
+        objects = []
+        searchRadius = self.genome.searchRadius
+        
+        for r in range(1, int(searchRadius)+1):
+            nextField = (self.yxPos[0]+r*direction[0], self.yxPos[1]+r*direction[1])
+            #boundary check
+            if not (0 <= nextField[0] < gridSize and 0 <= nextField[1] < gridSize):
+                break  # Out of bounds, return list as of now
+            
+            nextObject = self.worldToInhabit.grid[nextField]
+            if nextObject is not None:
+                objects.append(nextObject)
+        
+        return objects
+    
+    def getFwdPixies(self):
+        "returns a list of all pixies in viewAxis within searchRadius"
+        viewAxis = self.facing
+        direction = self.getNormalizedDirection(angle=viewAxis)
+        gridSize = self.worldToInhabit.size
+        fwdPixies = []
+        searchRadius = self.genome.searchRadius
+        
+        for r in range(1, searchRadius+1):
+            nextField = (self.yxPos[0]+r*direction[0], self.yxPos[1]+r*direction[1])
+            #boundary check
+            if not (0 <= nextField[0] < gridSize and 0 <= nextField[1] < gridSize):
+                break  # Out of bounds, return list as of now
+            
+            nextObject = self.worldToInhabit.grid[nextField]
+            if isinstance(nextObject, pixie):
+                fwdPixies.append(nextObject)
+        
+        return fwdPixies
+
  
 # environment classes 
 # class stone(object):

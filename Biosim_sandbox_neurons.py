@@ -2,7 +2,6 @@
 import math
 import numpy as np
 import random
-import Biosim_sandbox_environment as environment
 
 
 # Superclasses for the different Neurons
@@ -233,7 +232,7 @@ class blockageFwd(sensorN):
         super().__init__(attributedPixie)
 
     def __str__(self):
-        return f"blockageFwd: if the proximate field is blocked, 1, otherwise 0: {self.output}"
+        return f"blockageFwd: pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
 
     def execute(self):
         ""
@@ -251,17 +250,70 @@ class barrierFwd(sensorN):
         super().__init__(attributedPixie)
 
     def __str__(self):
-        return f"barrierFwd: if the proximate field contains a barrier, 1, otherwise 0: {self.output}"
+        return f"barrierFwd: pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
 
     def execute(self):
         ""
         proximateObject = self.attributedPixie.searchProximateField()
-        if isinstance(proximateObject, environment.stone):
+        if proximateObject.__class__.__name__ == "stone":
             self.output = 1
         else:
             self.output = 0
         self.transferOutput()
-    
+
+class pixieFwd(sensorN):
+    "returns the inverse of the distance of the nearest Pixie in facing direction"
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+
+    def __str__(self):
+        return f"pixieFwd: pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+
+    def execute(self):
+        ""
+        distances = []
+        allFwdPixies = self.attributedPixie.getFwdPixies()
+        if not allFwdPixies:
+            self.output = 0
+        else:
+            nearestFwdPixie = allFwdPixies[0]
+            d = self.attributedPixie.getEuclidianDistance(nearestFwdPixie)
+            self.output = 1/d
+        
+        self.transferOutput()
+
+class geneticSimilarity(sensorN):
+    "compute the genetic similarity by using the sets of all neuron classes as hamming distance proxy"
+    "outputs 1 if identical, zero if totally different"
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+
+    def __str__(self):
+        return f"geneticSimilarity: pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+
+    def execute(self):
+        "get the respective sets of all neuron Classes of the attributed and the other pixie. "
+        "Compute the number of neuron classes that overlap by combining the sets. "
+        "Divide this number (reverse proxy for hamming distance) "
+        "by the number of neuron Classes attributed Pixie has in total "
+        "to get a value between 0 and 1. Output is highest for identical neuronClass sets. "
+        "If no nearest Pixie is found, it returns 0 too"
+        nearestPixie = self.attributedPixie.getNearestPixie()
+        if nearestPixie is not None:
+            otherNeurons = nearestPixie.genome.allNeuronClasses
+            ownNeurons = self.attributedPixie.genome.allNeuronClasses
+            combinedLength = len(ownNeurons) + len(otherNeurons)
+            combinedNeurons = ownNeurons.union(otherNeurons)
+            hammingDistance = combinedLength - len(combinedNeurons)
+            self.output = hammingDistance/len(ownNeurons)
+        else:
+            self.output = 0
+        
+        if not 0 <= self.output <=1:
+            raise ValueError("Output not normalized!")
+        self.transferOutput()
+
+            
 
 
 ############# INTERNAL NEURONS
