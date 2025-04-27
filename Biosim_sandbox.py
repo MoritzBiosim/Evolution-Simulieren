@@ -20,6 +20,7 @@ class world():
 
         self.queueForMove = set()
         self.queueForKill = set()
+        self.sexualityCount = 0
     
     def __str__(self):
         return str(self.grid)
@@ -415,6 +416,9 @@ class genome():
         self.allNeurons = set() # includes all neuron objects    
         self.sourceNeurons = [] # contains all source neurons
         self.sinkNeurons = [] # contains all sink neurons
+
+        self.wantsToMate = set()
+        self.hasAlreadyMated = False
         
         # self.sensorToInternal = [] # obsolete
         # self.internalToInternal = [] # obsolete
@@ -944,13 +948,17 @@ def calculateDiversity(world):
             unique_genomes = set()
             for pixie in world.inhabitants: # add the DNA of every gene
                 unique_genomes.add(tuple(x.DNA for x in pixie.genome.genes))
-            diversity = len(unique_genomes) / numberOfPixies
+            diversity = len(unique_genomes) / numberOfPixies        #len(world.inhabitants) ???
             diversityOverTime.append(diversity)
 
 def calculateSurvivalRate(world):
     if calc_survivalRate:
-        survivalRate = len(world.inhabitants) / numberOfPixies
+        survivalRate = len(world.inhabitants) / numberOfPixies       
         survivalRateOverTime.append(survivalRate)
+
+def  calculateSexualityRate(world):
+    sexualityRate = world.sexualityCount / numberOfPixies
+    sexualityOverTime.append(sexualityRate)
 
 def simulateGenerations(startingPopulation=None):
     "Randomly simulate as many generations as specified. Optionally provide a starting Population (metagenome)."
@@ -973,6 +981,7 @@ def simulateGenerations(startingPopulation=None):
         render.render(firstWorld)
         render.create_gif(filename=f"world_1.gif")
     
+    calculateSexualityRate(firstWorld)
     calculateSurvivalRate(firstWorld)
 
     # following generations:
@@ -993,6 +1002,7 @@ def simulateGenerations(startingPopulation=None):
                 render.render(newWorld)
 
         # calculate the survival rate
+        calculateSexualityRate(firstWorld)
         calculateSurvivalRate(newWorld)
 
         # create a GIF
@@ -1046,7 +1056,7 @@ createGIFfor = [numberOfGenerations, 1, 2, 3, 10, 20, 100, 200, 300, 400, 500]
 
 survivalRateOverTime = [] # list containing survivalrate for each gen
 diversityOverTime = [] 
-
+sexualityOverTime = []
 
 
 simulateGenerations()

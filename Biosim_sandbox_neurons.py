@@ -601,6 +601,46 @@ class moveRandom(actionN):
         self.clearInput()
         self.attributedPixie.worldToInhabit.queueForMove.add(self.attributedPixie)
 
+class turnRight(actionN):
+    "change facing direction by pi/2 -> turnRight"
+
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+
+    def __str__(self):
+        return f"turnRight: pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+    
+    def execute(self):
+        "input gets converted to a probability, then executed"
+        normed_input = math.tanh(self.input)
+
+        if random.random() < abs(normed_input):
+            viewAxis = self.attributedPixie.facing
+            newAngle = (viewAxis + math.pi / 2) % (2 * math.pi)  # Normalize angle to [0, 2*pi]
+            self.attributedPixie.facing = newAngle
+        
+        self.clearInput()
+
+class turnLeft(actionN):
+    "change facing direction by -pi/2 -> turnLeft"
+
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+
+    def __str__(self):
+        return f"turnLeft: pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+    
+    def execute(self):
+        "input gets converted to a probability, then executed"
+        normed_input = math.tanh(self.input)
+
+        if random.random() < abs(normed_input):
+            viewAxis = self.attributedPixie.facing
+            newAngle = (viewAxis - math.pi / 2) % (2 * math.pi)  # Normalize angle to [0, 2*pi]
+            self.attributedPixie.facing = newAngle
+        
+        self.clearInput()
+
 class setOscPeriod(actionN):
     "double or halve the Period of the oscillator-neuron. Max value is a period of 100 simsteps"
 
@@ -673,4 +713,57 @@ class kill(actionN):
         
         self.clearInput()
             
+            
+class initiateSex(actionN):
+    "if the pixie encounters another pixie in the proximate field in facing direction, it can iniate sex, "
+    "meaning it is added to the other pixie's qeueForMate set. Only if both Pixies have not mated yet "
+    "and they are in each others qeue, is mating iniatiated. Each parent Pixie contributes "
+    "a random 50% of its genes to the offspring"
+    "The new DNA gets relevant when the genome gets loaded again in the next generation"
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+    
+    def __str__(self):
+        return f"initiateSex: pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+
+    def execute(self):
+        "input gets converted into a probability, then executed"
+        if not self.attributedPixie.genome.hasAlreadyMated:
+            normed_input = math.tanh(self.input)
+            if random.random() < abs(normed_input):
+
+                proximateObject = self.attributedPixie.searchProximateField()
+
+                if proximateObject is not None and proximateObject.__class__.__name__ == "pixie":
+                    proximateObject.genome.wantsToMate.add(self.attributedPixie)
+
+                    if proximateObject not in self.attributedPixie.genome.wantsToMate:
+                        pass
+                    else:
+                        if proximateObject.genome.hasAlreadyMated == False:
+                            newOwnGenome = []
+                            newOtherGenome = []
+                            start = random.randint(0,1)
+                            for gene in range(len(self.attributedPixie.genome.genes)):
+
+                                if (gene-start)%2 == 0:
+                                    #recieving another pixie's gene
+                                    newOwnGenome.append(proximateObject.genome.genes[gene])
+                                    newOtherGenome.append(self.attributedPixie.genome.genes[gene])
+                                else:
+                                    #keeping your own gene                          
+                                    newOwnGenome.append(self.attributedPixie.genome.genes[gene])
+                                    newOtherGenome.append(proximateObject.genome.genes[gene])
+
+                            self.attributedPixie.genome.genes = newOwnGenome
+                            proximateObject.genome.genes = newOtherGenome
+                                
+                            self.attributedPixie.genome.hasAlreadyMated = True
+                            proximateObject.genome.hasAlreadyMated = True
+                            self.attributedPixie.worldToInhabit.sexualityCount += 2
+                        else:
+                            pass
+       ### Wenn die Gene tauschen, ist dann attributedPixie von neurolink noch korrekt?!?!? Muss man das updaten?     
+        self.clearInput()
+
             
