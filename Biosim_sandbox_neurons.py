@@ -2,6 +2,7 @@
 import math
 import numpy as np
 import random
+import Biosim_sandbox_environment as env
 
 
 # Superclasses for the different Neurons
@@ -243,7 +244,6 @@ class blockageFwd(sensorN):
             self.output = 1
         self.transferOutput()
     
-
 class barrierFwd(sensorN):
     "checks for a barrier in facing direction and returns 1 if there is one, 0 otherwise"
     def __init__(self, attributedPixie):
@@ -334,8 +334,45 @@ class geneticSimilarity(sensorN):
             raise ValueError("Output not normalized!")
         self.transferOutput()
 
-            
+class OnOff(sensorN):
+    "alway return 1.0 or 0.0"
 
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+    
+    def __str__(self):
+        return f"OnOff: pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+
+    def execute(self):
+
+        if self.attributedPixie.genome.isOn:
+            self.output = 1.0
+        else:
+            self.output = 0.0
+        
+        self.transferOutput()
+
+class nextFood(sensorN):
+    "returns the inverse of the distance of the nearest Food Object in facing direction"
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+
+    def __str__(self):
+        return f"nextFood: pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+
+    def execute(self):
+        ""
+        allFwdObjects = self.attributedPixie.getFwdObjects()
+        allFwdFood = [obj for obj in allFwdObjects if isinstance(obj, env.food)]
+        if not allFwdFood:
+            self.output = 0
+        else:
+            print("<<DEBUG neurons.nextFood>> food found!")
+            nearestFwdObject = allFwdFood[0]
+            d = self.attributedPixie.getEuclidianDistance(nearestFwdObject)
+            self.output = 1/d
+        
+        self.transferOutput()
 
 ############# INTERNAL NEURONS
 
@@ -592,7 +629,7 @@ class moveRandom(actionN):
         "input gets converted to a probability, then executed"
         normed_input = math.tanh(self.input)
 
-        if random.random() < abs(normed_input):
+        if random.random() < normed_input:
             moveVector = (random.randint(-1, 1), random.randint(-1, 1))
 
             self.attributedPixie.moveY = moveVector[0]
@@ -614,7 +651,7 @@ class turnRight(actionN):
         "input gets converted to a probability, then executed"
         normed_input = math.tanh(self.input)
 
-        if random.random() < abs(normed_input):
+        if random.random() < normed_input:
             viewAxis = self.attributedPixie.facing
             newAngle = (viewAxis + math.pi / 2) % (2 * math.pi)  # Normalize angle to [0, 2*pi]
             self.attributedPixie.facing = newAngle
@@ -634,7 +671,7 @@ class turnLeft(actionN):
         "input gets converted to a probability, then executed"
         normed_input = math.tanh(self.input)
 
-        if random.random() < abs(normed_input):
+        if random.random() < normed_input:
             viewAxis = self.attributedPixie.facing
             newAngle = (viewAxis - math.pi / 2) % (2 * math.pi)  # Normalize angle to [0, 2*pi]
             self.attributedPixie.facing = newAngle
@@ -687,6 +724,24 @@ class setSearchRadius(actionN):
 
         self.clearInput()
 
+class setOnOff(actionN):
+    "flip the state of the isOn genome variabe"
+
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+    
+    def __str__(self):
+        return f"setOnOff: pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+
+    def execute(self):
+        "inputs get converted to a probability, then executed"
+        normed_input = math.tanh(self.input)
+
+        if random.random() < normed_input:
+            "flip the boolean isOn variable"
+            self.attributedPixie.genome.isOn = not self.attributedPixie.genome.isOn
+
+        self.clearInput()
 
 class kill(actionN):
     "if the nearest pixie is within killing distance, it is added to the queueForKill"
@@ -700,7 +755,7 @@ class kill(actionN):
         "input gets converted into a probability, then executed"
         normed_input = math.tanh(self.input)
 
-        if random.random() < abs(normed_input):
+        if random.random() < normed_input:
 
             potentialVictim = self.attributedPixie.getNearestPixie()
 
@@ -712,7 +767,32 @@ class kill(actionN):
                     pass
         
         self.clearInput()
-            
+
+class eatFood(actionN):
+    "if neighbouring a food object, consume it and gain energy"
+
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+
+    def __str__(self):
+        return f"kill: pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+
+    def execute(self):
+        "input gets converted into a probability, then executed"
+        normed_input = math.tanh(self.input)
+
+        if random.random() < normed_input:
+            nearFood = [obj for obj in self.attributedPixie.getAllEuclidianDistances() if isinstance(obj[0], env.food)]
+            if nearFood:
+                nearestFood = min(nearFood, key=lambda x: x[1])
+                if nearestFood[1] <= math.sqrt(2): # if food is in a neighbouring cell
+
+                    self.attributedPixie.energy += nearestFood[0].energyValue
+                    self.attributedPixie.worldToInhabit.environment.remove(nearestFood[0])
+                    self.attributedPixie.worldToInhabit.updateWorld()
+
+        self.clearInput()
+
             
 class initiateSex(actionN):
     "if the pixie encounters another pixie in the proximate field in facing direction, it can iniate sex, "
@@ -744,8 +824,9 @@ class initiateSex(actionN):
                             newOwnGenome = []
                             newOtherGenome = []
                             start = random.randint(0,1)
-                            for gene in range(len(self.attributedPixie.genome.genes)):
+                            for gene in range(len(self.attributedPixie.genome.genes)-1):
 
+                                ##PROBLEM: The length of a genome can vary because useless genes are removed while loading the genome
                                 if (gene-start)%2 == 0:
                                     #recieving another pixie's gene
                                     newOwnGenome.append(proximateObject.genome.genes[gene])

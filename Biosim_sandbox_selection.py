@@ -33,3 +33,10 @@ def killEdges(world):
     for pixie in list(world.getInhabitants()):
         if pixie.yxPos[1] <= world.size*(1/3) or pixie.yxPos[1] >= world.size*(2/3):
             world.inhabitants.remove(pixie)
+
+def killLowEnergy(world):
+    "kill every pixie that hasn't eaten"
+
+    for pixie in list(world.getInhabitants()):
+        if pixie.energy < 1:
+            world.inhabitants.remove(pixie)

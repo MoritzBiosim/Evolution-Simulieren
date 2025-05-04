@@ -33,10 +33,12 @@ class stone(object):
 class food(object):
     "class for food objects"
 
-    def __init__(self, worldToInhabit, name, yxPos, shape="food"):
+    def __init__(self, worldToInhabit, name, yxPos, nutritionValue=5, shape="food"):
         super().__init__(worldToInhabit, name, yxPos)
         self.shape = shape
         self.color = "FFFF00" # yellow
+        self.energyValue = nutritionValue
+
         worldToInhabit.environment.append(self)
 
 
@@ -57,6 +59,21 @@ def sparseFood(world):
     "place food randomly in the world, approx. 1 in every 50 gridspaces"
 
     num_food = int(world.size**2 / 50)
+
+    for i in range(num_food):
+        p = 0
+        while p < 1:
+            newYXPos = (random.randint(0, np.size(world.grid, 0)-1), random.randint(0, np.size(world.grid, 0)-1))
+            if world.grid[newYXPos]: # check if cell is already inhabited
+                continue
+            else:
+                newFood = food(world, "myFood", newYXPos)
+                p += 1
+
+def denseFood(world):
+    "place food randomly in the world, approx. 1 in every 20 gridspaces"
+
+    num_food = int(world.size**2 / 20)
 
     for i in range(num_food):
         p = 0

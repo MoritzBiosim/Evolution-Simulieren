@@ -9,8 +9,7 @@ import Biosim_sandbox_environment as environment
 
 
 class world():
-    """class containing the grid. Multiple grids are possible, but most of the times the
-    simulation takes place in only one world ("grid0")."""
+    """class containing the grid."""
 
     def __init__(self, size=10):
         self.size = size
@@ -98,10 +97,6 @@ class pixie(object):
         self.moveX = 0
         self.moveY = 0
 
-        # obsolete!
-        # pixie.listOfFunctions = [
-        #     self.walkTowards, self.move
-        # ]
 
         self.createGenome()
         worldToInhabit.inhabitants.append(self)
@@ -161,7 +156,7 @@ class pixie(object):
             self.yxPos = (int(self.yxPos[0]+vector[0]), int(self.yxPos[1]+vector[1])) # moving
             self.facing = self.getRelativeAngle(relVector=vector) # update "facing"-direction
 
-            # world.updateWorld() # <<<<<<<<<<< this may be needed
+            world.updateWorld() # <<<<<<<<<<< this may be needed
             #self.energy -= energyDeficitPerMove  #DAS HIER IST AUSGESCHALTET
             if self.energy < 0:
                 self.energy = 0
@@ -268,7 +263,7 @@ class pixie(object):
         neighbouring_pixies = []
         
         for i in neighbourhood:
-            if i[0] in world.inhabitants:
+            if i[0] in self.worldToInhabit.inhabitants:
                 neighbouring_pixies.append(i)
 
         if neighbouring_pixies:
@@ -354,7 +349,7 @@ class pixie(object):
         fwdPixies = []
         searchRadius = self.genome.searchRadius
         
-        for r in range(1, searchRadius+1):
+        for r in range(1, int(searchRadius+1)):
             nextField = (self.yxPos[0]+r*direction[0], self.yxPos[1]+r*direction[1])
             #boundary check
             if not (0 <= nextField[0] < gridSize and 0 <= nextField[1] < gridSize):
@@ -366,24 +361,6 @@ class pixie(object):
         
         return fwdPixies
 
- 
-# environment classes 
-# class stone(object):
-#     ""
-
-#     def __init__(self, worldToInhabit, name, yxPos, shape="square"):
-#         super().__init__(worldToInhabit, name, yxPos)
-#         self.shape = shape
-#         self.color = "5d5555" # gray
-#         worldToInhabit.environment.append(self)
-
-# class food(object):
-#     ""
-#     def __init__(self, worldToInhabit, name, yxPos, shape="food"):
-#         super().__init__(worldToInhabit, name, yxPos)
-#         self.shape = shape
-#         self.color = "FFFF00" # yellow
-#         worldToInhabit.environment.append(self)
 
 ################################################
 # GENOME CLASS
@@ -427,6 +404,8 @@ class genome():
         self.oscillatorPeriod = 8 # number of simsteps in one oscillator cycle
         self.searchRadius = 5 # searchradius used by functions like searchNeighbourhood
         self.killRadius = 2 #used by class kill()
+        self.isOn = True # used by OnOff neuron: True = On (1), False = Off (0)
+
         # instantiate new Neurolink objects
         if self.inheritedDNA: # instantiate new neurolink objects from old dna
             for gene in self.inheritedDNA:
@@ -729,7 +708,13 @@ sensor_dict = {
     4: neurons.randomOutput, 
     5: neurons.oscillator,
     6: neurons.popDensityFwd,
-    7: neurons.xPosition
+    7: neurons.blockageFwd,
+    8: neurons.barrierFwd,
+    9: neurons.nextPixie,
+    10: neurons.nextObject,
+    11: neurons.OnOff,
+    12: neurons.geneticSimilarity,
+    13: neurons.xPosition
 } # first and last index always has to code for the same neuron!
 
 internal_dict = {
@@ -751,7 +736,10 @@ action_dict = {
     8: neurons.moveRandom,
     9: neurons.setOscPeriod,
     10: neurons.setSearchRadius,
-    4: neurons.moveN
+    11: neurons.turnLeft,
+    12: neurons.turnRight,
+    13: neurons.eatFood,
+    14: neurons.moveN
 } # first and last index always has to code for the same neuron!
 
 ################################################
@@ -762,7 +750,8 @@ selection_criteria = {
     1: lambda x: selection.killRightHalf(x),
     2: lambda x: selection.killLeftHalf(x), 
     3: lambda x: selection.killMiddle(x),
-    4: lambda x: selection.killEdges(x)
+    4: lambda x: selection.killEdges(x),
+    5: lambda x: selection.killLowEnergy(x)
 }
 
 ################################################
@@ -771,7 +760,8 @@ selection_criteria = {
 environment_dict = {
     0: lambda x: environment.noEnvironment(x),
     1: lambda x: environment.barrierMiddleVertical(x),
-    2: lambda x: environment.sparseFood(x)
+    2: lambda x: environment.sparseFood(x),
+    3: lambda x: environment.denseFood(x)
 }
 
 ################################################
@@ -782,14 +772,15 @@ def eachSimStep(world, gen=None):
     # execute the genome for each pixie in the world
     for pixie in world.getInhabitants():
         pixie.executeGenome()
+        pixie.executeMove()
 
     # execute all actions that have been queued:
-    for pixie in world.queueForMove:
-        pixie.executeMove()
+    # for pixie in world.queueForMove:
+    #     pixie.executeMove() ##THIS GOT MOVED TO THE THE PIXIE LOOP ABOVE
     for pixie in world.queueForKill:
         world.inhabitants.remove(pixie)
         
-    world.queueForMove = set()
+    world.queueForMove = set() # (obsolete)
     world.queueForKill = set()
 
     world.updateWorld()
@@ -956,7 +947,7 @@ def calculateSurvivalRate(world):
         survivalRate = len(world.inhabitants) / numberOfPixies       
         survivalRateOverTime.append(survivalRate)
 
-def  calculateSexualityRate(world):
+def calculateSexualityRate(world):
     sexualityRate = world.sexualityCount / numberOfPixies
     sexualityOverTime.append(sexualityRate)
 
@@ -980,6 +971,9 @@ def simulateGenerations(startingPopulation=None):
     if createGIF != "none":
         render.render(firstWorld)
         render.create_gif(filename=f"world_1.gif")
+    if not firstWorld.inhabitants:
+            print("total extinction!!!")
+            return
     
     calculateSexualityRate(firstWorld)
     calculateSurvivalRate(firstWorld)
@@ -995,6 +989,10 @@ def simulateGenerations(startingPopulation=None):
 
         # kill pixies that don't suffice the selection criteria
         applySelectionCriteria(newWorld)
+        if not newWorld.inhabitants:
+            print("total extinction!!!")
+            break
+
         if createGIF != "none":
             if createGIF == "every" and (num+2) % createGIFevery == 0:
                 render.render(newWorld)
@@ -1002,7 +1000,7 @@ def simulateGenerations(startingPopulation=None):
                 render.render(newWorld)
 
         # calculate the survival rate
-        calculateSexualityRate(firstWorld)
+        #calculateSexualityRate(firstWorld)
         calculateSurvivalRate(newWorld)
 
         # create a GIF
@@ -1032,13 +1030,13 @@ def simulateGenerations(startingPopulation=None):
 # PARAMETERS
 
 # world parameters
-gridsize = 20
+gridsize = 30
 numberOfGenes = 8
 numberOfPixies = 100
-numberOfGenerations = 100
-numberOfSimSteps = 100
-selectionCriterium = 1 # key for selection_criteria dict
-environment_key = 1 # key for environment_dict dict
+numberOfGenerations = 50
+numberOfSimSteps = 20
+selectionCriterium = 5 # key for selection_criteria dict
+environment_key = 3 # key for environment_dict dict
 
 geneticDrift = False # if False, then each surviving pixie automatically produces at least one offspring
 
@@ -1061,4 +1059,3 @@ sexualityOverTime = []
 
 simulateGenerations()
 #simulateGenerations(readMetaGenome("metagenome.txt")) # a metagenome object can be provided as an argument if a previous population 
-

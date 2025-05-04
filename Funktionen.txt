@@ -12,14 +12,14 @@ object Funktionen:
 
 pixie-Funktionen:
 
-(-getEnergy --> return Energy variable)
+(-getEnergy --> return Energy variable) S
 - getGenome --> return Genome Objekt
 - createGenome --> erstellt random Genom (siehe Genome class)
 - executeGenome --> führt executeGenes-Funktion aus (siehe Genome class)
 
-- walkTowards --> nutzt die getRelativeVector und getDirection (umbenennen!!) Funktion um auf ein anderes Objekt hinzuzugehen
-- move --> "move along a provided Vector, but only if the new box is in Bounds and empty"
-- moveRandom --> gibt einen random vektor aus, entlang dem sich bewegt wird (move)
+- walkTowards --> nutzt die getRelativeVector und getDirection (umbenennen!!) Funktion um auf ein anderes Objekt hinzuzugehen A
+- move --> "move along a provided Vector, but only if the new box is in Bounds and empty" (A)
+- moveRandom --> gibt einen random vektor aus, entlang dem sich bewegt wird (move) A
 - getDirection --> nimmt ein Objekt oder einen Vektor als Input und gibt einen normalisierten Vektor in eine Himmelsrichtung aus
 - searchNeighbourhood --> sucht alle Objekte in einem bestimmten Suchradius und gibt sie als Liste aus
 - getAllEuclidianDistances --> rechnet für alle Objekte in searchNeighbourhood die Entfernung aus und speichert sie als Tupel in einer Liste
