@@ -739,7 +739,8 @@ action_dict = {
     11: neurons.turnLeft,
     12: neurons.turnRight,
     13: neurons.eatFood,
-    14: neurons.moveN
+    14: neurons.initiateSex,
+    15: neurons.moveN
 } # first and last index always has to code for the same neuron!
 
 ################################################
@@ -1032,11 +1033,11 @@ def simulateGenerations(startingPopulation=None):
 # world parameters
 gridsize = 30
 numberOfGenes = 8
-numberOfPixies = 100
+numberOfPixies = 500
 numberOfGenerations = 50
 numberOfSimSteps = 20
-selectionCriterium = 5 # key for selection_criteria dict
-environment_key = 3 # key for environment_dict dict
+selectionCriterium = 1 # key for selection_criteria dict
+environment_key = 0 # key for environment_dict dict
 
 geneticDrift = False # if False, then each surviving pixie automatically produces at least one offspring
 

@@ -824,27 +824,32 @@ class initiateSex(actionN):
                             newOwnGenome = []
                             newOtherGenome = []
                             start = random.randint(0,1)
-                            for gene in range(len(self.attributedPixie.genome.genes)-1):
 
-                                ##PROBLEM: The length of a genome can vary because useless genes are removed while loading the genome
-                                if (gene-start)%2 == 0:
-                                    #recieving another pixie's gene
-                                    newOwnGenome.append(proximateObject.genome.genes[gene])
-                                    newOtherGenome.append(self.attributedPixie.genome.genes[gene])
-                                else:
-                                    #keeping your own gene                          
-                                    newOwnGenome.append(self.attributedPixie.genome.genes[gene])
-                                    newOtherGenome.append(proximateObject.genome.genes[gene])
+                            ##PROBLEM: The length of a genome can vary because useless genes are removed while loading the genome
+                            # --> only if genomes are the same size
+                            if len(proximateObject.genome.genes) == len(self.attributedPixie.genome.genes):
+                                for gene in range(len(self.attributedPixie.genome.genes)-1):
 
-                            self.attributedPixie.genome.genes = newOwnGenome
-                            proximateObject.genome.genes = newOtherGenome
+                                    if (gene-start)%2 == 0:
+                                        #recieving another pixie's gene
+                                        newOwnGenome.append(proximateObject.genome.genes[gene])
+                                        newOtherGenome.append(self.attributedPixie.genome.genes[gene])
+                                    else:
+                                        #keeping your own gene                          
+                                        newOwnGenome.append(self.attributedPixie.genome.genes[gene])
+                                        newOtherGenome.append(proximateObject.genome.genes[gene])
+
+                                self.attributedPixie.genome.genes = newOwnGenome
+                                proximateObject.genome.genes = newOtherGenome
+                                    
+                                self.attributedPixie.genome.hasAlreadyMated = True
+                                proximateObject.genome.hasAlreadyMated = True
+                                self.attributedPixie.worldToInhabit.sexualityCount += 2
                                 
-                            self.attributedPixie.genome.hasAlreadyMated = True
-                            proximateObject.genome.hasAlreadyMated = True
-                            self.attributedPixie.worldToInhabit.sexualityCount += 2
-                        else:
-                            pass
-       ### Wenn die Gene tauschen, ist dann attributedPixie von neurolink noch korrekt?!?!? Muss man das updaten?     
+                            else:
+                                pass
+       ### Wenn die Gene tauschen, ist dann attributedPixie von neurolink noch korrekt?!?!? Muss man das updaten?  
+       #        unwichtig, da attributedPixie nur im Moment von loadGenome verwendet wird   
         self.clearInput()
 
             
