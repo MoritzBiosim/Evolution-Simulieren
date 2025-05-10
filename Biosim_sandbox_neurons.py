@@ -303,6 +303,41 @@ class nextObject(sensorN):
         
         self.transferOutput()
 
+class borderDst(sensorN):
+    "output 1 if the border is very near and 0 if it is very far"
+
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+
+    def __str__(self):
+        return f"barrierFwd: pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+
+    def execute(self):
+        ""
+        # take the vector from the .facing attribute of the attributed pixie
+        facingV = self.attributedPixie.getNormalizedDirection(angle=self.attributedPixie.facing)
+
+        # while-loop: check if the facing-vector from the position of the pixie is inside the world borders.
+        # if yes, multiply the facing vector by ++1 and check again
+        # if no, break and return the length of the facing vector
+        
+        probingV = facingV
+        worldSize = self.attributedPixie.worldToInhabit.size - 1
+        
+        for i in range(worldSize):
+            yProbe = self.attributedPixie.yxPos[0] + probingV[0]*i
+            xProbe = self.attributedPixie.yxPos[1] + probingV[1]*i
+
+            if yProbe < 0 or yProbe > worldSize or xProbe < 0 or xProbe > worldSize:
+                # out of bounds
+                borderDistance = math.sqrt((probingV[0]*i)**2 + (probingV[1]*i)**2)
+                break
+            else: 
+                pass
+
+        self.output = 1 - (borderDistance / worldSize)
+        self.transferOutput()
+
 class geneticSimilarity(sensorN):
     "compute the genetic similarity by using the sets of all neuron classes as hamming distance proxy"
     "outputs 1 if identical, zero if totally different"
@@ -367,7 +402,7 @@ class nextFood(sensorN):
         if not allFwdFood:
             self.output = 0
         else:
-            print("<<DEBUG neurons.nextFood>> food found!")
+            #print("<<DEBUG neurons.nextFood>> food found!")
             nearestFwdObject = allFwdFood[0]
             d = self.attributedPixie.getEuclidianDistance(nearestFwdObject)
             self.output = 1/d
@@ -426,6 +461,67 @@ class InterNeuron3(internalN):
         out = math.tanh(self.input)
 
         self.output = out
+
+        self.clearInput()
+        self.transferOutput()
+
+class AbsNeuron1(internalN):
+    ""
+
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+
+    def __str__(self):
+        return f"Absolute Neuron 1: pixie {self.attributedPixie}, input {self.input}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+    
+    def execute(self):
+        "run the input through a tanh function and return the value"
+
+        out = math.tanh(self.input)
+
+        self.output = abs(out)
+
+        self.clearInput()
+        self.transferOutput()
+
+class PosNeuron1(internalN):
+    ""
+
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+    
+    def execute(self):
+        "if the input is positive, run it through a tanh function and return the value. else return 0"
+
+        if self.input <= 0:
+
+            self.output = 0
+
+        else:
+            out = math.tanh(self.input)
+
+            self.output = out
+
+        self.clearInput()
+        self.transferOutput()
+
+class NegNeuron1(internalN):
+    ""
+
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+    
+    def execute(self):
+        "if the input is negative, run it through a tanh function and return the value. else return 0"
+
+        if self.input >= 0:
+
+            self.output = 0
+
+        else:
+            out = math.tanh(self.input)
+
+            self.output = out
 
         self.clearInput()
         self.transferOutput()
@@ -762,7 +858,10 @@ class kill(actionN):
             if potentialVictim is not None:
                 distance = self.attributedPixie.getEuclidianDistance(potentialVictim)
                 if distance <= self.attributedPixie.genome.killRadius:
+                    # kill
                     self.attributedPixie.worldToInhabit.queueForKill.add(potentialVictim)
+                    # feed (gain half the pixies energy)
+                    self.attributedPixie.energy += int(potentialVictim.energy/2)
                 else:
                     pass
         

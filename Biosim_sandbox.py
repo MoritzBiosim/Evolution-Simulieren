@@ -156,11 +156,11 @@ class pixie(object):
             self.yxPos = (int(self.yxPos[0]+vector[0]), int(self.yxPos[1]+vector[1])) # moving
             self.facing = self.getRelativeAngle(relVector=vector) # update "facing"-direction
 
-            world.updateWorld() # <<<<<<<<<<< this may be needed
-            #self.energy -= energyDeficitPerMove  #DAS HIER IST AUSGESCHALTET
+            world.updateWorld() 
+
+            self.energy -= energyDeficitPerMove  
             if self.energy < 0:
                 self.energy = 0
-            # print(f"{self.name} moved by {vector}")
 
     def moveRandom(self):
         """move in a random direction but only if the new value is in bounds and the
@@ -714,7 +714,8 @@ sensor_dict = {
     10: neurons.nextObject,
     11: neurons.OnOff,
     12: neurons.geneticSimilarity,
-    13: neurons.xPosition
+    13: neurons.nextFood,
+    14: neurons.xPosition
 } # first and last index always has to code for the same neuron!
 
 internal_dict = {
@@ -940,7 +941,8 @@ def calculateDiversity(world):
             unique_genomes = set()
             for pixie in world.inhabitants: # add the DNA of every gene
                 unique_genomes.add(tuple(x.DNA for x in pixie.genome.genes))
-            diversity = len(unique_genomes) / numberOfPixies        #len(world.inhabitants) ???
+            diversity = 1 - (1 / len(unique_genomes))      #len(world.inhabitants) ???
+            #diversity = len(unique_genomes) / len(world.inhabitants)
             diversityOverTime.append(diversity)
 
 def calculateSurvivalRate(world):
@@ -1033,17 +1035,18 @@ def simulateGenerations(startingPopulation=None):
 # world parameters
 gridsize = 30
 numberOfGenes = 8
-numberOfPixies = 500
-numberOfGenerations = 50
-numberOfSimSteps = 20
-selectionCriterium = 1 # key for selection_criteria dict
-environment_key = 0 # key for environment_dict dict
+numberOfPixies = 300
+numberOfGenerations = 20
+numberOfSimSteps = 50
+selectionCriterium = 5 # key for selection_criteria dict
+environment_key = 3 # key for environment_dict dict
 
-geneticDrift = False # if False, then each surviving pixie automatically produces at least one offspring
+geneticDrift = True # if False, then each surviving pixie automatically produces at least one offspring
 
 # pixie parameters
 mutationRate = 0.005
 defaultEnergy = 0
+energyDeficitPerMove = 0
 
 # analytics
 save_metagenome = False
