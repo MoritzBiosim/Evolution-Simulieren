@@ -403,6 +403,7 @@ class nextFood(sensorN):
             self.output = 0
         else:
             #print("<<DEBUG neurons.nextFood>> food found!")
+            #print("<<DEBUG neurons.nextFood>> food found!")
             nearestFwdObject = allFwdFood[0]
             d = self.attributedPixie.getEuclidianDistance(nearestFwdObject)
             self.output = 1/d
@@ -520,7 +521,70 @@ class NegNeuron1(internalN):
 
         else:
             out = math.tanh(self.input)
+        out = math.tanh(self.input)
 
+        self.output = out
+
+        self.clearInput()
+        self.transferOutput()
+
+class AbsNeuron1(internalN):
+    ""
+
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+
+    def __str__(self):
+        return f"Absolute Neuron 1: pixie {self.attributedPixie}, input {self.input}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+    
+    def execute(self):
+        "run the input through a tanh function and return the value"
+
+        out = math.tanh(self.input)
+
+        self.output = abs(out)
+
+        self.clearInput()
+        self.transferOutput()
+
+class PosNeuron1(internalN):
+    ""
+
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+    
+    def execute(self):
+        "if the input is positive, run it through a tanh function and return the value. else return 0"
+
+        if self.input <= 0:
+
+            self.output = 0
+
+        else:
+            out = math.tanh(self.input)
+
+            self.output = out
+
+        self.clearInput()
+        self.transferOutput()
+
+class NegNeuron1(internalN):
+    ""
+
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+    
+    def execute(self):
+        "if the input is negative, run it through a tanh function and return the value. else return 0"
+
+        if self.input >= 0:
+
+            self.output = 0
+
+        else:
+            out = math.tanh(self.input)
+
+            self.output = out
             self.output = out
 
         self.clearInput()
@@ -859,7 +923,10 @@ class kill(actionN):
                 distance = self.attributedPixie.getEuclidianDistance(potentialVictim)
                 if distance <= self.attributedPixie.genome.killRadius:
                     # kill
+                    # kill
                     self.attributedPixie.worldToInhabit.queueForKill.add(potentialVictim)
+                    # feed (gain half the pixies energy)
+                    self.attributedPixie.energy += int(potentialVictim.energy/2)
                     # feed (gain half the pixies energy)
                     self.attributedPixie.energy += int(potentialVictim.energy/2)
                 else:
