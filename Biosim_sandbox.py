@@ -1035,7 +1035,7 @@ def simulateGenerations(startingPopulation=None):
 # world parameters
 gridsize = 20
 numberOfGenes = 8
-numberOfPixies = 500
+numberOfPixies = 501
 numberOfGenerations = 50
 numberOfSimSteps = 20
 selectionCriterium = 1 # key for selection_criteria dict
