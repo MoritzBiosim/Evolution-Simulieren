@@ -1033,13 +1033,13 @@ def simulateGenerations(startingPopulation=None):
 # PARAMETERS
 
 # world parameters
-gridsize = 30
+gridsize = 20
 numberOfGenes = 8
-numberOfPixies = 300
-numberOfGenerations = 20
-numberOfSimSteps = 50
-selectionCriterium = 5 # key for selection_criteria dict
-environment_key = 3 # key for environment_dict dict
+numberOfPixies = 100
+numberOfGenerations = 1
+numberOfSimSteps = 30
+selectionCriterium = 0 # key for selection_criteria dict
+environment_key = 0 # key for environment_dict dict
 
 geneticDrift = True # if False, then each surviving pixie automatically produces at least one offspring
 

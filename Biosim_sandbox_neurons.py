@@ -330,7 +330,7 @@ class borderDst(sensorN):
 
             if yProbe < 0 or yProbe > worldSize or xProbe < 0 or xProbe > worldSize:
                 # out of bounds
-                borderDistance = math.sqrt((probingV[0]*i)**2 + (probingV[1]*i)**2)
+                borderDistance = math.sqrt((probingV[0]*i)**2 + (probingV[1]*i)**2) 
                 break
             else: 
                 pass
