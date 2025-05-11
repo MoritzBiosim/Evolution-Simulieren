@@ -63,14 +63,15 @@ def clear_gif():
     gif_frames.clear()
     gc.collect
 
-def calcSurvivalAndDiversity(list_survival=None, list_diversity=None):
+def calcSurvivalAndDiversity(selCrit, list_survival=None, list_diversity=None):
     if list_survival:
         plt.plot(list_survival, label="survival rate")
         # print(list_survival)
     if list_diversity:
         plt.plot(list_diversity, label="diversity")
     
-    plt.title("survival rates and diversity in the population over time")
+    plt.suptitle("survival rates and diversity in the population over time")
+    plt.title(f"selection criterium: {selCrit}")
     plt.xlabel("generation")
     plt.ylim(0,1)
     plt.legend()

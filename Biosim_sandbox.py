@@ -748,12 +748,12 @@ action_dict = {
 # SELECTION CRITERIA
 
 selection_criteria = {
-    0: lambda x: selection.doNothing(x),
-    1: lambda x: selection.killRightHalf(x),
-    2: lambda x: selection.killLeftHalf(x), 
-    3: lambda x: selection.killMiddle(x),
-    4: lambda x: selection.killEdges(x),
-    5: lambda x: selection.killLowEnergy(x)
+    "doNothing": lambda x, y: selection.doNothing(x, y),
+    "killRightHalf": lambda x, y: selection.killRightHalf(x, y),
+    "killLeftHalf": lambda x, y: selection.killLeftHalf(x, y), 
+    "killMiddle": lambda x, y: selection.killMiddle(x, y),
+    "killEdges": lambda x, y: selection.killEdges(x, y),
+    "killLowEnergy": lambda x, y: selection.killLowEnergy(x, y)
 }
 
 ################################################
@@ -775,6 +775,7 @@ def eachSimStep(world, gen=None):
     for pixie in world.getInhabitants():
         pixie.executeGenome()
         pixie.executeMove()
+        pixie.energy -= energyDeficitPerSimStep
 
     # execute all actions that have been queued:
     # for pixie in world.queueForMove:
@@ -926,14 +927,14 @@ def readMetaGenome(textfile):
 
     return metagenome
 
-def applySelectionCriteria(world):
+def applySelectionCriteria(world, mortalityRate):
     ""
     # get Function from selection_criteria dict
     i = selectionCriterium
     selectionFunction = selection_criteria[i]
 
     # execute Function
-    selectionFunction(world)
+    selectionFunction(world, mortalityRate)
     world.updateWorld()
 
 def calculateDiversity(world):
@@ -941,8 +942,8 @@ def calculateDiversity(world):
             unique_genomes = set()
             for pixie in world.inhabitants: # add the DNA of every gene
                 unique_genomes.add(tuple(x.DNA for x in pixie.genome.genes))
-            diversity = 1 - (1 / len(unique_genomes))      #len(world.inhabitants) ???
-            #diversity = len(unique_genomes) / len(world.inhabitants)
+            #diversity = 1 - (1 / len(unique_genomes))      #len(world.inhabitants) ???
+            diversity = len(unique_genomes) / len(world.inhabitants)
             diversityOverTime.append(diversity)
 
 def calculateSurvivalRate(world):
@@ -970,7 +971,7 @@ def simulateGenerations(startingPopulation=None):
         eachSimStep(firstWorld)
 
     # kill pixies that don't suffice the selection criteria
-    applySelectionCriteria(firstWorld)
+    applySelectionCriteria(firstWorld, mortalityRate)
     if createGIF != "none":
         render.render(firstWorld)
         render.create_gif(filename=f"world_1.gif")
@@ -991,7 +992,7 @@ def simulateGenerations(startingPopulation=None):
             eachSimStep(newWorld, gen=num+2)
 
         # kill pixies that don't suffice the selection criteria
-        applySelectionCriteria(newWorld)
+        applySelectionCriteria(newWorld, mortalityRate)
         if not newWorld.inhabitants:
             print("total extinction!!!")
             break
@@ -1026,7 +1027,7 @@ def simulateGenerations(startingPopulation=None):
     print(f"time elapsed: {time.time() - start_time} seconds")
 
     if calc_survivalRate or calc_diversity:
-        render.calcSurvivalAndDiversity(list_survival=survivalRateOverTime, list_diversity=diversityOverTime)
+        render.calcSurvivalAndDiversity(selCrit=selectionCriterium, list_survival=survivalRateOverTime, list_diversity=diversityOverTime)
 
 
 ################################################
@@ -1034,19 +1035,21 @@ def simulateGenerations(startingPopulation=None):
 
 # world parameters
 gridsize = 20
-numberOfGenes = 8
-numberOfPixies = 501
+numberOfGenes = 4
+numberOfPixies = 150
 numberOfGenerations = 50
 numberOfSimSteps = 20
-selectionCriterium = 1 # key for selection_criteria dict
+selectionCriterium = "killRightHalf" # key for selection_criteria dict
 environment_key = 0 # key for environment_dict dict
 
 geneticDrift = True # if False, then each surviving pixie automatically produces at least one offspring
+mortalityRate = 0.9 # chance, that a pixie is killed by selectionCriterium
 
 # pixie parameters
 mutationRate = 0.005
 defaultEnergy = 0
 energyDeficitPerMove = 0
+energyDeficitPerSimStep = 0
 
 # analytics
 save_metagenome = False

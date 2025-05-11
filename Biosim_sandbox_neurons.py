@@ -528,14 +528,14 @@ class NegNeuron1(internalN):
         self.clearInput()
         self.transferOutput()
 
-class AbsNeuron1(internalN):
+class AbsNeuron2(internalN):
     ""
 
     def __init__(self, attributedPixie):
         super().__init__(attributedPixie)
 
     def __str__(self):
-        return f"Absolute Neuron 1: pixie {self.attributedPixie}, input {self.input}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+        return f"Absolute Neuron 2: pixie {self.attributedPixie}, input {self.input}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
     
     def execute(self):
         "run the input through a tanh function and return the value"
@@ -547,7 +547,7 @@ class AbsNeuron1(internalN):
         self.clearInput()
         self.transferOutput()
 
-class PosNeuron1(internalN):
+class PosNeuron2(internalN):
     ""
 
     def __init__(self, attributedPixie):
@@ -568,7 +568,7 @@ class PosNeuron1(internalN):
         self.clearInput()
         self.transferOutput()
 
-class NegNeuron1(internalN):
+class NegNeuron2(internalN):
     ""
 
     def __init__(self, attributedPixie):
