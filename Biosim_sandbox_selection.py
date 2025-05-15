@@ -41,7 +41,7 @@ def killLowEnergy(world, mortalityRate):
 
     for pixie in list(world.getInhabitants()):
         if random.random() < mortalityRate:
-            if pixie.energy < 1:
+            if pixie.energy < 6:
                 world.inhabitants.remove(pixie)
 
 def killMiddle_LowEnergy(world, mortalityRate):

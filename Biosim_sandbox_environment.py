@@ -37,7 +37,7 @@ class food(object):
         super().__init__(worldToInhabit, name, yxPos)
         self.shape = shape
         self.color = "FFFF00" # yellow
-        self.energyValue = nutritionValue
+        self.energy = nutritionValue
 
         worldToInhabit.environment.append(self)
 
@@ -56,9 +56,9 @@ def barrierMiddleVertical(world):
         myStone = stone(world, "mystone", (idx, xPos))
 
 def sparseFood(world):
-    "place food randomly in the world, approx. 1 in every 50 gridspaces"
+    "place food randomly in the world, 1 in every 40 gridspaces"
 
-    num_food = int(world.size**2 / 50)
+    num_food = int(world.size**2 / 40)
 
     for i in range(num_food):
         p = 0
@@ -67,7 +67,7 @@ def sparseFood(world):
             if world.grid[newYXPos]: # check if cell is already inhabited
                 continue
             else:
-                newFood = food(world, "myFood", newYXPos)
+                newFood = food(world, "myFood", newYXPos, nutritionValue=5)
                 p += 1
 
 def denseFood(world):
@@ -84,3 +84,25 @@ def denseFood(world):
             else:
                 newFood = food(world, "myFood", newYXPos)
                 p += 1
+
+def sparseRocks(world):
+    "randomly placed stones in 1 in every 30 gridspaces"
+
+    num_stones = int(world.size**2/30)
+
+    for i in range(num_stones):
+        p = 0
+        while p < 1:
+            newYXPos = (random.randint(0, np.size(world.grid, 0)-1), random.randint(0, np.size(world.grid, 0)-1))
+            if world.grid[newYXPos]: # check if cell is already inhabited
+                continue
+            else:
+                newStone = stone(world, "myStone", newYXPos)
+                p += 1
+
+
+def foodAndStones(world):
+    "combination of denseFood and sparseRocks"
+
+    denseFood(world)
+    sparseRocks(world)

@@ -216,7 +216,7 @@ class popDensityFwd(sensorN):
         cache = []
 
         viewAxis = self.attributedPixie.facing
-        neighbourhood = self.attributedPixie.getAllEuclidianDistances()
+        neighbourhood = [obj for obj in self.attributedPixie.getAllEuclidianDistances() if hasattr(obj[0], "genome")] # genome as proxy for pixie class
         for tuple in neighbourhood:
             dist = tuple[1]
             if dist > 0:
@@ -324,7 +324,7 @@ class borderDst(sensorN):
         probingV = facingV
         worldSize = self.attributedPixie.worldToInhabit.size - 1
         
-        for i in range(worldSize):
+        for i in range(2*worldSize):
             yProbe = self.attributedPixie.yxPos[0] + probingV[0]*i
             xProbe = self.attributedPixie.yxPos[1] + probingV[1]*i
 
@@ -408,6 +408,34 @@ class nextFood(sensorN):
             d = self.attributedPixie.getEuclidianDistance(nearestFwdObject)
             self.output = 1/d
         
+        self.transferOutput()
+
+class nutritionDensity(sensorN):
+    "scans the surrounding for objects with an energy value and returns highest for objects in front and lowest for objects behind"
+
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+    
+    def __str__(self):
+        return f"nutritiondensity: pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+
+    def execute(self):
+        ""
+        # get the view axis, compute the denstity 'quantum' for each object and sum it up
+        # divide the sum by twice the search-Radius to get a value between 0 and 1
+
+        cache = []
+
+        viewAxis = self.attributedPixie.facing
+        neighbourhood = [obj for obj in self.attributedPixie.getAllEuclidianDistances() if hasattr(obj[0], "energy")] # energy as proxy for pixie class
+        for tuple in neighbourhood:
+            dist = tuple[1]
+            if dist > 0:
+                relAngle = self.attributedPixie.getRelativeAngle(otherObject=tuple[0])
+                factor = math.cos(relAngle - viewAxis) * tuple[0].energy # multiply with energy value
+                cache.append(1 / dist * factor)
+        
+        self.output = sum(cache) / (1.9*(self.attributedPixie.genome.searchRadius-0.5)) # norming factor
         self.transferOutput()
 
 ############# INTERNAL NEURONS
@@ -953,7 +981,7 @@ class eatFood(actionN):
                 nearestFood = min(nearFood, key=lambda x: x[1])
                 if nearestFood[1] <= math.sqrt(2): # if food is in a neighbouring cell
 
-                    self.attributedPixie.energy += nearestFood[0].energyValue
+                    self.attributedPixie.energy += nearestFood[0].energy
                     self.attributedPixie.worldToInhabit.environment.remove(nearestFood[0])
                     self.attributedPixie.worldToInhabit.updateWorld()
 

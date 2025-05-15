@@ -715,33 +715,39 @@ sensor_dict = {
     11: neurons.OnOff,
     12: neurons.geneticSimilarity,
     13: neurons.nextFood,
-    14: neurons.xPosition
+    14: neurons.borderDst,
+    15: neurons.nutritionDensity,
+    16: neurons.xPosition
 } # first and last index always has to code for the same neuron!
 
 internal_dict = {
     0: neurons.InterNeuron1,
     1: neurons.InterNeuron2,
-    2: neurons.InterNeuron3,
-    3: neurons.InterNeuron1
+    2: neurons.InterNeuron3, 
+    3: neurons.AbsNeuron1,
+    4: neurons.PosNeuron1,
+    5: neurons.NegNeuron1,
+    6: neurons.InterNeuron1
 } # first and last index always has to code for the same neuron!
 
 action_dict = {
-    0: neurons.moveN,
-    1: neurons.moveS,
-    2: neurons.moveE,
-    3: neurons.moveW,
-    4: neurons.moveB,
-    5: neurons.moveF,
-    6: neurons.moveL,
-    7: neurons.moveR,
-    8: neurons.moveRandom,
-    9: neurons.setOscPeriod,
-    10: neurons.setSearchRadius,
-    11: neurons.turnLeft,
-    12: neurons.turnRight,
-    13: neurons.eatFood,
-    14: neurons.initiateSex,
-    15: neurons.moveN
+    #0: neurons.moveN,
+    #1: neurons.moveS,
+    #2: neurons.moveE,
+    #3: neurons.moveW,
+    0: neurons.moveB,
+    1: neurons.moveF,
+    2: neurons.moveL,
+    3: neurons.moveR,
+    4: neurons.moveRandom,
+    5: neurons.setOscPeriod,
+    6: neurons.setSearchRadius,
+    7: neurons.turnLeft,
+    8: neurons.turnRight,
+    9: neurons.eatFood,
+    #10: neurons.initiateSex,
+    #11: neurons.kill,
+    10: neurons.moveB
 } # first and last index always has to code for the same neuron!
 
 ################################################
@@ -763,7 +769,9 @@ environment_dict = {
     0: lambda x: environment.noEnvironment(x),
     1: lambda x: environment.barrierMiddleVertical(x),
     2: lambda x: environment.sparseFood(x),
-    3: lambda x: environment.denseFood(x)
+    3: lambda x: environment.denseFood(x),
+    4: lambda x: environment.sparseRocks(x),
+    5: lambda x: environment.foodAndStones(x)
 }
 
 ################################################
@@ -1034,32 +1042,32 @@ def simulateGenerations(startingPopulation=None):
 # PARAMETERS
 
 # world parameters
-gridsize = 20
-numberOfGenes = 4
-numberOfPixies = 150
-numberOfGenerations = 50
-numberOfSimSteps = 20
-selectionCriterium = "killRightHalf" # key for selection_criteria dict
-environment_key = 0 # key for environment_dict dict
+gridsize = 100
+numberOfGenes = 12
+numberOfPixies = 1000
+numberOfGenerations = 5
+numberOfSimSteps = 15
+selectionCriterium = "killLowEnergy" # key for selection_criteria dict
+environment_key = 5 # key for environment_dict 
 
-geneticDrift = True # if False, then each surviving pixie automatically produces at least one offspring
-mortalityRate = 0.9 # chance, that a pixie is killed by selectionCriterium
+geneticDrift = False # if False, then each surviving pixie automatically produces at least one offspring
+mortalityRate = 1.0 # chance, that a pixie is killed by selectionCriterium
 
 # pixie parameters
-mutationRate = 0.005
+mutationRate = 0.01
 defaultEnergy = 0
 energyDeficitPerMove = 0
 energyDeficitPerSimStep = 0
 
 # analytics
-save_metagenome = False
+save_metagenome = True
 calc_survivalRate = True
 calc_diversity = True
 createGIF = "selected"  # "none", "every" or "selected"
 createGIFevery = 1
-createGIFfor = [numberOfGenerations, 1, 2, 3, 10, 20, 100, 200, 300, 400, 500]
+createGIFfor = [numberOfGenerations, 1, 2, 3, 10, 20, 50, 100, 200, 300, 400, 500]
 
-survivalRateOverTime = [] # list containing survivalrate for each gen
+survivalRateOverTime = [] # list containing survivalrate for each generation
 diversityOverTime = [] 
 sexualityOverTime = []
 
