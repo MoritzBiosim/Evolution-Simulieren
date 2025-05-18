@@ -476,21 +476,20 @@ class genome():
             #print("reset", neuron)
             # recount the connections
             for neurolink in self.genes:
-                if neurolink.source == neuron.__class__:
-                    neuron.numOutputs += 1
-                if neurolink.sink == neuron.__class__:
-                    neuron.numInputs += 1
-                if neurolink.source == neuron.__class__ and neurolink.sink == neuron.__class__:
-                    neuron.numSelfInputs += 1
+                if not neurolink.useless:
+                    if neurolink.source == neuron.__class__:
+                        neuron.numOutputs += 1
+                    if neurolink.sink == neuron.__class__:
+                        neuron.numInputs += 1
+                    if neurolink.source == neuron.__class__ and neurolink.sink == neuron.__class__:
+                        neuron.numSelfInputs += 1
         
     def removeUselessGenes(self):
-        "dangerous business"
-
-        # need to be also removed from allNeurons
+        "useless genes are not entirely removed, but 'silenced' by setting the uselessGene-bool."        
         
         for neuron in self.sinkNeurons:
             if neuron.__class__ in internal_dict.values():
-                # remove all internal neurons which have numOutputs 0 and the neurolinks that lead to it
+                # remove all internal neurons which have numOutputs 0 and silence the neurolinks that lead to it
                 if neuron.numOutputs == 0:
                     self.sinkNeurons.remove(neuron)
                     #print("removed", neuron)
@@ -501,9 +500,10 @@ class genome():
                     selfLinks_to_remove = [neurolink for neurolink in self.genes if neurolink.sink == neuron.__class__]
                     if selfLinks_to_remove:
                         for selfLink_to_remove in selfLinks_to_remove:
-                            self.genes.remove(selfLink_to_remove)
+                            #self.genes.remove(selfLink_to_remove)
+                            selfLink_to_remove.useless = True
                             #print("removed link", selfLink_to_remove)
-                # remove all internal neurons which have numInputs 0 and the neurolinks that lead from it
+                # remove all internal neurons which have numInputs 0 and silence the neurolinks that lead from it
                 if neuron.numInputs == 0:
                     self.sinkNeurons.remove(neuron)
                     # print("removed", neuron)
@@ -514,7 +514,8 @@ class genome():
                     links_to_remove = [neurolink for neurolink in self.genes if neurolink.source == neuron.__class__]
                     if links_to_remove:
                         for selfLink_to_remove in links_to_remove:
-                            self.genes.remove(selfLink_to_remove)
+                            #self.genes.remove(selfLink_to_remove)
+                            selfLink_to_remove.useless = True
                             # print("removed link", selfLink_to_remove)
                 # remove all internal neurons which have numSelfInputs = numOutputs or numInputs, + its neurolinks
                 elif (neuron.numOutputs == neuron.numSelfInputs or neuron.numInputs == neuron.numSelfInputs) and neuron.numSelfInputs > 0:
@@ -528,7 +529,8 @@ class genome():
                     selfLinks_to_remove = [neurolink for neurolink in self.genes if neurolink.source == neuron.__class__ or neurolink.sink == neuron.__class__]
                     if selfLinks_to_remove:
                         for selfLink_to_remove in selfLinks_to_remove:
-                            self.genes.remove(selfLink_to_remove)
+                            # self.genes.remove(selfLink_to_remove)
+                            selfLink_to_remove.useless = True
                             # print("removed link", selfLink_to_remove)
         # now check if there are any sources left with numOutputs 0 and if yes, remove them
         self.calculateConnectivity()
@@ -563,10 +565,11 @@ class genome():
         "sort the corresponding sink objects into the ownSinks-list of the source neuron"
 
         for neurolink in self.genes:
-            source_neuron = next(obj for obj in self.sourceNeurons if neurolink.source == obj.__class__)
-            sink_neuron = next(obj for obj in self.sinkNeurons if neurolink.sink == obj.__class__)
-            weight = neurolink.weight
-            source_neuron.ownSinks.append((sink_neuron, weight))
+            if not neurolink.useless:
+                source_neuron = next(obj for obj in self.sourceNeurons if neurolink.source == obj.__class__)
+                sink_neuron = next(obj for obj in self.sinkNeurons if neurolink.sink == obj.__class__)
+                weight = neurolink.weight
+                source_neuron.ownSinks.append((sink_neuron, weight))
 
     def checkFunctioningGenome(self):
         "check if there are any action neurons in the sink list or sensors in the source list"
@@ -609,6 +612,7 @@ class Neurolink():
         self.source = None
         self.sink = None
         self.weight = None
+        self.useless = False
         self.mapIDs2Links()
 
     def __str__(self):
@@ -759,7 +763,8 @@ selection_criteria = {
     "killLeftHalf": lambda x, y: selection.killLeftHalf(x, y), 
     "killMiddle": lambda x, y: selection.killMiddle(x, y),
     "killEdges": lambda x, y: selection.killEdges(x, y),
-    "killLowEnergy": lambda x, y: selection.killLowEnergy(x, y)
+    "killLowEnergy": lambda x, y: selection.killLowEnergy(x, y),
+    "killEdges&LowEnergy": lambda x, y: selection.killEdges_LowEnergy(x, y)
 }
 
 ################################################
@@ -800,12 +805,12 @@ def eachSimStep(world, gen=None):
     if createGIF != "none":  
         if gen:
             if createGIF == "selected" and gen in createGIFfor:
-                render.render(world)
+                render.render(world, circleDiameter=GIF_resolution)
             elif createGIF == "every" and (gen) % createGIFevery == 0:
-                render.render(world)
+                render.render(world, circleDiameter=GIF_resolution)
             
         else: 
-            render.render(world)
+            render.render(world, circleDiameter=GIF_resolution)
 
 def spawnPixie(world, inheritedDNA=None, newHexColor=None):
     "spawn a single pixie"
@@ -981,7 +986,7 @@ def simulateGenerations(startingPopulation=None):
     # kill pixies that don't suffice the selection criteria
     applySelectionCriteria(firstWorld, mortalityRate)
     if createGIF != "none":
-        render.render(firstWorld)
+        render.render(firstWorld, circleDiameter=GIF_resolution)
         render.create_gif(filename=f"world_1.gif")
     if not firstWorld.inhabitants:
             print("total extinction!!!")
@@ -1007,9 +1012,9 @@ def simulateGenerations(startingPopulation=None):
 
         if createGIF != "none":
             if createGIF == "every" and (num+2) % createGIFevery == 0:
-                render.render(newWorld)
+                render.render(newWorld, circleDiameter=GIF_resolution)
             elif createGIF == "selected" and (num+2) in createGIFfor:
-                render.render(newWorld)
+                render.render(newWorld, circleDiameter=GIF_resolution)
 
         # calculate the survival rate
         #calculateSexualityRate(firstWorld)
@@ -1030,6 +1035,22 @@ def simulateGenerations(startingPopulation=None):
         if num == numberOfGenerations-2:
             if save_metagenome:
                 saveMetaGenome(newWorld)
+
+        # nur kurz zum debuggen
+        funcLessGenomes = 0
+        for pixie in newWorld.getInhabitants():
+            print(pixie, "gene num:", len(pixie.genome.genes))
+            if pixie.genome.functioningGenome == False:
+                funcLessGenomes += 1
+            num_useless = 0
+            for neurolink in pixie.genome.genes:
+                #print("useless:", neurolink.useless)
+                if neurolink.useless:
+                    num_useless += 1
+            print("useless genes:", num_useless)
+            print("functioning Genome:", pixie.genome.functioningGenome)
+            print("number of neurons:", len(pixie.genome.allNeurons))
+        print("functionless Genomes:", funcLessGenomes)
     
     print("all done!")
     print(f"time elapsed: {time.time() - start_time} seconds")
@@ -1042,13 +1063,13 @@ def simulateGenerations(startingPopulation=None):
 # PARAMETERS
 
 # world parameters
-gridsize = 100
-numberOfGenes = 12
-numberOfPixies = 1000
-numberOfGenerations = 5
+gridsize = 30
+numberOfGenes = 4
+numberOfPixies = 300
+numberOfGenerations = 2
 numberOfSimSteps = 15
-selectionCriterium = "killLowEnergy" # key for selection_criteria dict
-environment_key = 5 # key for environment_dict 
+selectionCriterium = "doNothing" # key for selection_criteria dict
+environment_key = 0 # key for environment_dict 
 
 geneticDrift = False # if False, then each surviving pixie automatically produces at least one offspring
 mortalityRate = 1.0 # chance, that a pixie is killed by selectionCriterium
@@ -1064,6 +1085,7 @@ save_metagenome = True
 calc_survivalRate = True
 calc_diversity = True
 createGIF = "selected"  # "none", "every" or "selected"
+GIF_resolution = 10 # number of pixels = width of a cell
 createGIFevery = 1
 createGIFfor = [numberOfGenerations, 1, 2, 3, 10, 20, 50, 100, 200, 300, 400, 500]
 

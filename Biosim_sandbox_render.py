@@ -44,10 +44,10 @@ def render(world, circleDiameter=30, spacing=0, show_image=False):
             if hasattr(object, "facing"):
                 facing_y = math.sin(object.facing) * (circleDiameter/2)
                 facing_x = math.cos(object.facing) * (circleDiameter/2)
-                x_point = object.yxPos[1] * cellSize + spacing +15 + facing_x
-                y_point = object.yxPos[0] * cellSize + spacing +15 + facing_y
+                x_point = object.yxPos[1] * cellSize + spacing + circleDiameter/2 + facing_x
+                y_point = object.yxPos[0] * cellSize + spacing + circleDiameter/2 + facing_y
 
-                draw.circle(xy=(x_point, y_point), radius=4, fill=rgb_color)
+                draw.circle(xy=(x_point, y_point), radius=circleDiameter/7, fill=rgb_color)
        
         
     gif_frames.append(image)
