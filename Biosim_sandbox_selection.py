@@ -50,6 +50,6 @@ def killMiddle_LowEnergy(world, mortalityRate):
     killMiddle(world, mortalityRate)
 
 def killEdges_LowEnergy(world, mortalityRate):
-
+    ""
     killLowEnergy(world, mortalityRate)
     killEdges(world, mortalityRate)

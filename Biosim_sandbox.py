@@ -1036,21 +1036,21 @@ def simulateGenerations(startingPopulation=None):
             if save_metagenome:
                 saveMetaGenome(newWorld)
 
-        # nur kurz zum debuggen
-        funcLessGenomes = 0
-        for pixie in newWorld.getInhabitants():
-            print(pixie, "gene num:", len(pixie.genome.genes))
-            if pixie.genome.functioningGenome == False:
-                funcLessGenomes += 1
-            num_useless = 0
-            for neurolink in pixie.genome.genes:
-                #print("useless:", neurolink.useless)
-                if neurolink.useless:
-                    num_useless += 1
-            print("useless genes:", num_useless)
-            print("functioning Genome:", pixie.genome.functioningGenome)
-            print("number of neurons:", len(pixie.genome.allNeurons))
-        print("functionless Genomes:", funcLessGenomes)
+        ### nur kurz zum debuggen
+        # funcLessGenomes = 0
+        # for pixie in newWorld.getInhabitants():
+        #     print(pixie, "gene num:", len(pixie.genome.genes))
+        #     if pixie.genome.functioningGenome == False:
+        #         funcLessGenomes += 1
+        #     num_useless = 0
+        #     for neurolink in pixie.genome.genes:
+        #         #print("useless:", neurolink.useless)
+        #         if neurolink.useless:
+        #             num_useless += 1
+        #     print("useless genes:", num_useless)
+        #     print("functioning Genome:", pixie.genome.functioningGenome)
+        #     print("number of neurons:", len(pixie.genome.allNeurons))
+        # print("functionless Genomes:", funcLessGenomes)
     
     print("all done!")
     print(f"time elapsed: {time.time() - start_time} seconds")

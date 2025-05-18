@@ -47,7 +47,7 @@ def render(world, circleDiameter=30, spacing=0, show_image=False):
                 x_point = object.yxPos[1] * cellSize + spacing + circleDiameter/2 + facing_x
                 y_point = object.yxPos[0] * cellSize + spacing + circleDiameter/2 + facing_y
 
-                draw.circle(xy=(x_point, y_point), radius=circleDiameter/7, fill=rgb_color)
+                draw.circle(xy=(x_point, y_point), radius=circleDiameter/7, fill=rgb_color) 
        
         
     gif_frames.append(image)
