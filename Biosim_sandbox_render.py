@@ -54,8 +54,12 @@ def render(world, circleDiameter=30, spacing=0, show_image=False):
     if show_image:
         image.show()
 
-def create_gif(filename="sandbox.gif"):
-    gif_frames[0].save(filename, save_all=True, append_images=gif_frames[1:],duration=200, loop=0)
+def create_gif(filename="sandbox.gif", directory=None):
+    if directory:
+        img_dir = directory / filename
+    else: 
+        img_dir = filename
+    gif_frames[0].save(img_dir, save_all=True, append_images=gif_frames[1:],duration=200, loop=0)
     clear_gif()
 
 def clear_gif():
@@ -63,7 +67,7 @@ def clear_gif():
     gif_frames.clear()
     gc.collect
 
-def calcSurvivalAndDiversity(selCrit, list_survival=None, list_diversity=None):
+def calcSurvivalAndDiversity(selCrit, list_survival=None, list_diversity=None, directory=None):
     if list_survival:
         plt.plot(list_survival, label="survival rate")
         # print(list_survival)
@@ -75,4 +79,8 @@ def calcSurvivalAndDiversity(selCrit, list_survival=None, list_diversity=None):
     plt.xlabel("generation")
     plt.ylim(0,1)
     plt.legend()
-    plt.show()
+    if directory:
+        save_dir = directory / "survival_diversity_plot.png"
+        plt.savefig(save_dir)
+    else:
+        plt.show()

@@ -2,6 +2,8 @@ import random
 import numpy as np
 import math 
 import time
+from datetime import datetime
+from pathlib import Path
 import Biosim_sandbox_render as render
 import Biosim_sandbox_neurons as neurons
 import Biosim_sandbox_selection as selection
@@ -894,13 +896,14 @@ def mutateGenes(gene_list):
         gene = "".join(["1" if bit == "0" and random.random() < mutationRate else "0" if bit == "1" and random.random() < mutationRate else bit for bit in gene])
     return gene_list
 
-def saveMetaGenome(world):
+def saveMetaGenome(world, newDir):
     "save the Genomes of all pixies in a csv file"
 
     # genes contains neurolink objects, which have the attributes .attributedPixie, .DNA, .source, .sink and .weight
     genomes_list = [inhabitant.genome.genes for inhabitant in world.getInhabitants()]
 
-    with open(f"metagenome.txt", "w") as textfile:
+    filedir = newDir / "metagenome.txt"
+    with open(filedir, "w") as textfile:
         textfile.write("PixieName,DNA,connections\n")
         for genes_list in genomes_list:
             DNA_list = []
@@ -974,6 +977,11 @@ def simulateGenerations(startingPopulation=None):
     print("simulating...")
     start_time = time.time()
 
+    # create new parent folder to save all files created in this simulation run
+    now = datetime.now().strftime("%Y-%m-%d-%H-%M")
+    folder_dir = Path("Biosim_run_" + now)
+    folder_dir.mkdir(parents=True, exist_ok=True)
+
     if gridsize**2 < numberOfPixies:
         raise OverflowError("too many pixies for the grid!")
 
@@ -1024,17 +1032,17 @@ def simulateGenerations(startingPopulation=None):
         if createGIF != "none":
             if createGIF == "every":
                 if (num+2) % createGIFevery == 0:
-                    render.create_gif(filename=f"world_{num+2}.gif")
+                    render.create_gif(filename=f"world_{num+2}.gif", directory=folder_dir)
             elif createGIF == "selected":
                 if (num+2) in createGIFfor:
-                    render.create_gif(filename=f"world_{num+2}.gif")
+                    render.create_gif(filename=f"world_{num+2}.gif", directory=folder_dir)
 
         oldWorld = newWorld
 
         # in the last world, save the metagenome
         if num == numberOfGenerations-2:
             if save_metagenome:
-                saveMetaGenome(newWorld)
+                saveMetaGenome(newWorld, folder_dir)
 
         ### nur kurz zum debuggen
         # funcLessGenomes = 0
@@ -1056,7 +1064,7 @@ def simulateGenerations(startingPopulation=None):
     print(f"time elapsed: {time.time() - start_time} seconds")
 
     if calc_survivalRate or calc_diversity:
-        render.calcSurvivalAndDiversity(selCrit=selectionCriterium, list_survival=survivalRateOverTime, list_diversity=diversityOverTime)
+        render.calcSurvivalAndDiversity(selCrit=selectionCriterium, list_survival=survivalRateOverTime, list_diversity=diversityOverTime, directory=folder_dir)
 
 
 ################################################
@@ -1066,12 +1074,12 @@ def simulateGenerations(startingPopulation=None):
 gridsize = 30
 numberOfGenes = 4
 numberOfPixies = 300
-numberOfGenerations = 2
+numberOfGenerations = 40
 numberOfSimSteps = 15
-selectionCriterium = "doNothing" # key for selection_criteria dict
+selectionCriterium = "killRightHalf" # key for selection_criteria dict
 environment_key = 0 # key for environment_dict 
 
-geneticDrift = False # if False, then each surviving pixie automatically produces at least one offspring
+geneticDrift = True # if False, then each surviving pixie automatically produces at least one offspring
 mortalityRate = 1.0 # chance, that a pixie is killed by selectionCriterium
 
 # pixie parameters
