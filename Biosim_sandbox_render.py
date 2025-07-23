@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 
 gif_frames = []
 mullerplot_dicts = []
+color_dict = {}
 # aufzurufen als render.render(grid0)
 def render(world, circleDiameter=30, spacing=0, show_image=False):
 
@@ -94,6 +95,11 @@ def countLineages(inhabitants):
         dna = [hex(int(neurolink.DNA, 2))[2:] for neurolink in indiv.genome.genes] # this is a list of hexcode strings
         
         allGenotypes.append(tuple(dna))
+
+        # attach color to genotype
+        col = indiv.color
+        rgb_color = tuple(int(col[i:i+2], 16)/255 for i in (0, 2, 4))
+        color_dict[tuple(dna)] = rgb_color
     
     # sort genotypes into a dict, track the number of occurrences
     lineages = {}
@@ -115,9 +121,16 @@ def generateMullerPlot(filename="mullerplot.png", directory=None):
     # extract all unique genomes from mullerplot_dicts
     genome_tracker = {}
     gen_counter = []
-    for dicty in mullerplot_dicts:
-        for genome in dicty.keys():
-            genome_tracker[genome] = []
+    unique_genomes = []
+    colores = []
+    for i, generation_dict in enumerate(mullerplot_dicts):
+        gen_dict_keys = generation_dict.keys()
+        for genome in gen_dict_keys:
+            if genome not in genome_tracker:
+                genome_tracker[genome] = []
+                unique_genomes.append(genome)
+    
+    colores = [color_dict[genome] for genome in unique_genomes]
 
     # add frequencies for each generation
     for i, generation_dict in enumerate(mullerplot_dicts):
@@ -131,8 +144,9 @@ def generateMullerPlot(filename="mullerplot.png", directory=None):
             if genome not in generation_dict.keys():
                 genome_tracker[genome].append(0)
 
+
     fig, ax = plt.subplots()
-    ax.stackplot(gen_counter, genome_tracker.values())
+    ax.stackplot(gen_counter, genome_tracker.values(), colors=colores) # deactivate colors=colores if mutations make graph unclear
     # ax.legend(loc='upper left')
     ax.set_title('Muller Plot')
     ax.set_xlabel('Generation')
