@@ -407,6 +407,7 @@ class genome():
         self.searchRadius = 5 # searchradius used by functions like searchNeighbourhood
         self.killRadius = 2 #used by class kill()
         self.isOn = True # used by OnOff neuron: True = On (1), False = Off (0)
+        self.mutator = 1 # factor by which gene mutation chance is multiplied
 
         # instantiate new Neurolink objects
         if self.inheritedDNA: # instantiate new neurolink objects from old dna
@@ -737,10 +738,10 @@ internal_dict = {
 } # first and last index always has to code for the same neuron!
 
 action_dict = {
-    #0: neurons.moveN,
-    #1: neurons.moveS,
-    #2: neurons.moveE,
-    #3: neurons.moveW,
+    10: neurons.moveN,
+    11: neurons.moveS,
+    12: neurons.moveE,
+    13: neurons.moveW,
     0: neurons.moveB,
     1: neurons.moveF,
     2: neurons.moveL,
@@ -753,7 +754,7 @@ action_dict = {
     9: neurons.eatFood,
     #10: neurons.initiateSex,
     #11: neurons.kill,
-    10: neurons.moveB
+    14: neurons.moveB
 } # first and last index always has to code for the same neuron!
 
 ################################################
@@ -844,7 +845,7 @@ def newGeneration(oldWorld=None, existingGenomes=None):
             for i in range(numberOfPixies):
                 predecessor = random.choice(oldPopulation)
 
-                inheritedGenes = [neurolink.DNA for neurolink in predecessor.genome.genes]
+                inheritedGenes = ([neurolink.DNA for neurolink in predecessor.genome.genes], predecessor.genome.mutator)
                 possiblyMutatedDNA = mutateGenes(gene_list=inheritedGenes)
 
                 inheritedColor = predecessor.color # this doesn't allow for color mutations
@@ -853,7 +854,7 @@ def newGeneration(oldWorld=None, existingGenomes=None):
         else:
             for predecessor in oldPopulation:
                 "each surviving pixie produces one offspring"
-                inheritedGenes = [neurolink.DNA for neurolink in predecessor.genome.genes]
+                inheritedGenes = ([neurolink.DNA for neurolink in predecessor.genome.genes], predecessor.genome.mutator)
                 possiblyMutatedDNA = mutateGenes(gene_list=inheritedGenes)
 
                 inheritedColor = predecessor.color # this doesn't allow for color mutations
@@ -864,7 +865,7 @@ def newGeneration(oldWorld=None, existingGenomes=None):
                 "fill up the rest with randomly chosen pixies"
                 predecessor = random.choice(oldPopulation)
 
-                inheritedGenes = [neurolink.DNA for neurolink in predecessor.genome.genes]
+                inheritedGenes = ([neurolink.DNA for neurolink in predecessor.genome.genes], predecessor.genome.mutator)
                 possiblyMutatedDNA = mutateGenes(gene_list=inheritedGenes)
 
                 inheritedColor = predecessor.color # this doesn't allow for color mutations
@@ -887,14 +888,17 @@ def newGeneration(oldWorld=None, existingGenomes=None):
 
 def mutateGenes(gene_list):
     "iterate through the DNA bits and change it with a small chance"
-    
-    for gene in gene_list:
+    genes, mutator = gene_list
+
+    for gene in genes:
         # for i in range(len(gene)):
         #     if random.random() < mutationRate:
         #         gene[i] = "1" if gene[i] == "0" else "0"
         #         gene = "".join(["1" if bit == "0" else "0" for bit in gene if random.random() < mutationRate])
-        gene = "".join(["1" if bit == "0" and random.random() < mutationRate else "0" if bit == "1" and random.random() < mutationRate else bit for bit in gene])
-    return gene_list
+        mutChance = mutationRate * mutator
+        
+        gene = "".join(["1" if bit == "0" and random.random() < mutChance else "0" if bit == "1" and random.random() < mutChance else bit for bit in gene])
+    return genes
 
 def saveMetaGenome(world, newDir):
     "save the Genomes of all pixies in a csv file"
@@ -988,14 +992,17 @@ def simulateGenerations(startingPopulation=None):
     # first generation: 
     firstWorld = newGeneration(existingGenomes=startingPopulation)
     calculateDiversity(firstWorld)
+    render.countLineages(firstWorld.inhabitants)
     for i in range(numberOfSimSteps):
         eachSimStep(firstWorld)
 
     # kill pixies that don't suffice the selection criteria
     applySelectionCriteria(firstWorld, mortalityRate)
+
+    # do the render stuff
     if createGIF != "none":
         render.render(firstWorld, circleDiameter=GIF_resolution)
-        render.create_gif(filename=f"world_1.gif")
+        render.create_gif(filename=f"world_1.gif", directory=folder_dir)
     if not firstWorld.inhabitants:
             print("total extinction!!!")
             return
@@ -1008,6 +1015,7 @@ def simulateGenerations(startingPopulation=None):
     for num in range(numberOfGenerations-1): # -1 because the first world already got created
         newWorld = newGeneration(oldWorld=oldWorld)
         calculateDiversity(newWorld)
+        render.countLineages(newWorld.inhabitants)
 
         for i in range(numberOfSimSteps):
             eachSimStep(newWorld, gen=num+2)
@@ -1065,17 +1073,19 @@ def simulateGenerations(startingPopulation=None):
 
     if calc_survivalRate or calc_diversity:
         render.calcSurvivalAndDiversity(selCrit=selectionCriterium, list_survival=survivalRateOverTime, list_diversity=diversityOverTime, directory=folder_dir)
+    if generate_mullerplot:
+        render.generateMullerPlot(directory=folder_dir)
 
 
 ################################################
 # PARAMETERS
 
 # world parameters
-gridsize = 30
-numberOfGenes = 4
-numberOfPixies = 300
-numberOfGenerations = 40
-numberOfSimSteps = 15
+gridsize = 20
+numberOfGenes = 6
+numberOfPixies = 30
+numberOfGenerations = 20
+numberOfSimSteps = 20
 selectionCriterium = "killRightHalf" # key for selection_criteria dict
 environment_key = 0 # key for environment_dict 
 
@@ -1092,10 +1102,11 @@ energyDeficitPerSimStep = 0
 save_metagenome = True
 calc_survivalRate = True
 calc_diversity = True
+generate_mullerplot = True
 createGIF = "selected"  # "none", "every" or "selected"
 GIF_resolution = 10 # number of pixels = width of a cell
 createGIFevery = 1
-createGIFfor = [numberOfGenerations, 1, 2, 3, 10, 20, 50, 100, 200, 300, 400, 500]
+createGIFfor = [numberOfGenerations, 1, 2, 3, 5, 10, 20, 50, 100, 200, 300, 400, 500]
 
 survivalRateOverTime = [] # list containing survivalrate for each generation
 diversityOverTime = [] 

@@ -881,10 +881,10 @@ class setOscPeriod(actionN):
         sign = np.sign(normed_input)
 
         if random.random() < abs(normed_input):
+            self.attributedPixie.genome.oscillatorPeriod = self.attributedPixie.genome.oscillatorPeriod * 2**sign
+
             if self.attributedPixie.genome.oscillatorPeriod > 100:
                 self.attributedPixie.genome.oscillatorPeriod = 100
-            else:
-                self.attributedPixie.genome.oscillatorPeriod = self.attributedPixie.genome.oscillatorPeriod * 2**sign
 
         self.clearInput()
 
@@ -986,6 +986,30 @@ class eatFood(actionN):
                     self.attributedPixie.worldToInhabit.updateWorld()
 
         self.clearInput()
+
+class setMutator(actionN):
+    "change the chance multiplier by which mutations are randomly inserted in genes"
+
+    def __init__(self, attributedPixie):
+        super().__init__(attributedPixie)
+    
+    def __str__(self):
+        return f"setMutator: pixie {self.attributedPixie}, output {self.output}, numInputs {self.numInputs}, numOutputs {self.numOutputs}, numSelfInputs {self.numSelfInputs}"
+
+    def execute(self):
+        "inputs get converted to a probability, then executed"
+        normed_input = math.tanh(self.input)
+        sign = np.sign(normed_input)
+
+        if random.random() < abs(normed_input):
+            # mutator gets doubled or halved (capped at 100)
+            self.attributedPixie.genome.mutator = self.attributedPixie.genome.mutator * 2**sign
+
+            if self.attributedPixie.genome.mutator > 100:
+                self.attributedPixie.genome.mutator = 100
+
+        self.clearInput()
+
 
             
 class initiateSex(actionN):

@@ -5,6 +5,7 @@ import gc
 import matplotlib.pyplot as plt
 
 gif_frames = []
+mullerplot_dicts = []
 # aufzurufen als render.render(grid0)
 def render(world, circleDiameter=30, spacing=0, show_image=False):
 
@@ -81,6 +82,62 @@ def calcSurvivalAndDiversity(selCrit, list_survival=None, list_diversity=None, d
     plt.legend()
     if directory:
         save_dir = directory / "survival_diversity_plot.png"
+        plt.savefig(save_dir)
+    else:
+        plt.show()
+
+def countLineages(inhabitants):
+    "sort the unique genotpyes of each generation into a dictionary with genotype as key and occurrence as value"
+
+    allGenotypes = []
+    for indiv in inhabitants:
+        dna = [hex(int(neurolink.DNA, 2))[2:] for neurolink in indiv.genome.genes] # this is a list of hexcode strings
+        
+        allGenotypes.append(tuple(dna))
+    
+    # sort genotypes into a dict, track the number of occurrences
+    lineages = {}
+    for gt in allGenotypes:
+        if gt not in lineages.keys():
+            lineages[gt] = 1
+        elif gt in lineages.keys():
+            lineages[gt] += 1
+
+    mullerplot_dicts.append(lineages)
+
+    
+def generateMullerPlot(filename="mullerplot.png", directory=None):
+    "generate a stackplot that resembles a Muller Plot by grouping identical individuals"
+    "and thus show the lineages making up the population."
+    # This muller plot cannot track which mutations arise in which lineages
+    # Note: The consistency of colors may only be guaranteed when mutationRate = 0
+
+    # extract all unique genomes from mullerplot_dicts
+    genome_tracker = {}
+    gen_counter = []
+    for dicty in mullerplot_dicts:
+        for genome in dicty.keys():
+            genome_tracker[genome] = []
+
+    # add frequencies for each generation
+    for i, generation_dict in enumerate(mullerplot_dicts):
+        gen_counter.append(i)
+        
+        # assign current frequency to the corresponding element in genome_tracker
+        for genome in generation_dict.keys():
+            genome_tracker[genome].append(generation_dict[genome])
+        # all genomes that don't occur in that generation get a 0 assigned
+        for genome in genome_tracker.keys():
+            if genome not in generation_dict.keys():
+                genome_tracker[genome].append(0)
+
+    fig, ax = plt.subplots()
+    ax.stackplot(gen_counter, genome_tracker.values())
+    # ax.legend(loc='upper left')
+    ax.set_title('Muller Plot')
+    ax.set_xlabel('Generation')
+    if directory:
+        save_dir = directory / "mullerplot.png"
         plt.savefig(save_dir)
     else:
         plt.show()
