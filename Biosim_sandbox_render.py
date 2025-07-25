@@ -3,6 +3,10 @@ import math
 from PIL import Image, ImageDraw
 import gc
 import matplotlib.pyplot as plt
+from matplotlib.patches import Circle, FancyArrowPatch, Arc
+import inspect
+import random
+import Biosim_sandbox_neurons as n
 
 gif_frames = []
 mullerplot_dicts = []
@@ -110,8 +114,7 @@ def countLineages(inhabitants):
             lineages[gt] += 1
 
     mullerplot_dicts.append(lineages)
-
-    
+  
 def generateMullerPlot(filename="mullerplot.png", directory=None, realColors=False):
     "generate a stackplot that resembles a Muller Plot by grouping identical individuals"
     "and thus show the lineages making up the population."
@@ -163,5 +166,129 @@ def generateMullerPlot(filename="mullerplot.png", directory=None, realColors=Fal
     if directory:
         save_dir = directory / "mullerplot.png"
         plt.savefig(save_dir)
+        save_dir2 = directory / "mullerplot.pdf"
+        plt.savefig(save_dir2)
     else:
         plt.show()
+
+
+## mostly chatGPT:
+def visualizePixieBrain(pixie, directory=None):
+    def neuron_level(neuron):
+        bases = inspect.getmro(neuron.__class__)
+        if n.sensorN in bases:
+            return 'sensor'
+        elif n.internalN in bases:
+            return 'internal'
+        elif n.actionN in bases:
+            return 'action'
+        else:
+            return 'unknown'
+
+    neurons = list(pixie.genome.allNeurons)
+    for i in neurons:
+        if i not in pixie.genome.sourceNeurons and i not in pixie.genome.sinkNeurons:
+            neurons.remove(i)          
+    
+    # Neuronen nach Ebenen sortieren
+    layers = {'sensor': [], 'internal': [], 'action': []}
+    for neuron in neurons:
+        level = neuron_level(neuron)
+        if level in layers:
+            layers[level].append(neuron)
+
+    # Positionen vorbereiten
+    positions = {}
+    radius = 0.5
+    y_spacing = 1.5
+    layer_y = {'sensor': y_spacing * 2, 'internal': y_spacing, 'action': 0}
+
+    plt.figure(figsize=(12, 8))
+    ax = plt.gca()
+
+    for layer_name, neuron_list in layers.items():
+        y = layer_y[layer_name]
+        count = len(neuron_list)
+        if count == 0:
+            continue
+        spacing = 2.5
+        x_start = - (count - 1) * spacing / 2
+        for i, neuron in enumerate(neuron_list):
+            x = x_start + i * spacing
+            positions[neuron.__class__] = (x, y)
+            circle = Circle((x, y), radius, color='lightblue', ec='black', zorder=2)
+            ax.add_patch(circle)
+            ax.text(x, y, neuron.__class__.__name__, ha='center', va='center', fontsize=9, zorder=3)
+
+    connection_count = {}
+
+    for gene in pixie.genome.genes:
+        src_id = gene.source
+        sink_id = gene.sink
+        weight = gene.weight
+        color = 'green' if weight >= 0 else 'red'
+        width = max(0.5, min(abs(weight) * 2, 6))
+
+        if src_id not in positions or sink_id not in positions:
+            continue
+
+        x1, y1 = positions[src_id]
+        x2, y2 = positions[sink_id]
+
+        if src_id == sink_id:
+            # Selbstverbindung als Bogen
+            loop_offset = 1 + random.random() / 2
+            arc = Arc((x1, y1 + 0.3 * loop_offset), 1.2*loop_offset, 0.8*loop_offset, theta1=300, theta2=240,
+                      color=color, linewidth=width, zorder=1)
+            ax.add_patch(arc)
+            continue
+
+        dx, dy = x2 - x1, y2 - y1
+        length = (dx**2 + dy**2)**0.5
+        if length < 1e-6:
+            continue
+
+        shrink_ratio = radius / length
+        x1s = x1 + dx * shrink_ratio
+        y1s = y1 + dy * shrink_ratio
+        x2s = x2 - dx * shrink_ratio
+        y2s = y2 - dy * shrink_ratio
+
+        # Offset für Mehrfachverbindungen
+        key = (src_id, sink_id)
+        offset_count = connection_count.get(key, 0)
+        connection_count[key] = offset_count + 1
+
+        offset_magnitude = 0.2 * offset_count
+        angle_offset = random.uniform(-0.3, 0.3)  # etwas zufälliger Winkeloffset
+        perp_dx = -dy / length
+        perp_dy = dx / length
+
+        x1s += perp_dx * offset_magnitude + random.uniform(-0.05, 0.05)
+        y1s += perp_dy * offset_magnitude + random.uniform(-0.05, 0.05)
+        x2s += perp_dx * offset_magnitude + random.uniform(-0.05, 0.05)
+        y2s += perp_dy * offset_magnitude + random.uniform(-0.05, 0.05)
+
+        arrow = FancyArrowPatch(
+            (x1s, y1s), (x2s, y2s),
+            arrowstyle='-|>',
+            mutation_scale=20,
+            linewidth=width,
+            color=color,
+            zorder=1,
+            alpha=0.9
+        )
+        ax.add_patch(arrow)
+
+    ax.relim()
+    ax.autoscale_view()
+    ax.axis('off')
+    ax.set_aspect('equal')
+    plt.title("Pixie Brain Visualization")
+    plt.tight_layout()
+    if directory:
+        save_dir = directory / "sample_brain.png"
+        plt.savefig(save_dir)
+    else:
+        plt.show()
+    plt.close()

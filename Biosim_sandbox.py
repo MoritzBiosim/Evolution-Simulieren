@@ -731,10 +731,10 @@ internal_dict = {
     0: neurons.InterNeuron1,
     1: neurons.InterNeuron2,
     2: neurons.InterNeuron3, 
-    3: neurons.AbsNeuron1,
-    4: neurons.PosNeuron1,
-    5: neurons.NegNeuron1,
-    6: neurons.InterNeuron1
+    # 3: neurons.AbsNeuron1,
+    # 4: neurons.PosNeuron1,
+    # 5: neurons.NegNeuron1,
+    3: neurons.InterNeuron1
 } # first and last index always has to code for the same neuron!
 
 action_dict = {
@@ -854,7 +854,7 @@ def spawnPixie(world, inheritedDNA=None, newHexColor=None):
 
 def inheritPixie(predecessor, newWorld):
     "get the DNA and color from the predecessor, mutate it, and spawn a new pixie"
-    
+
     inheritedGenes = ([neurolink.DNA for neurolink in predecessor.genome.genes], predecessor.genome.mutator)
     possiblyMutatedDNA = mutateGenes(gene_list=inheritedGenes)
 
@@ -1063,10 +1063,14 @@ def simulateGenerations(startingPopulation=None):
 
         oldWorld = newWorld
 
-        # in the last world, save the metagenome
+        # in the last world, save the metagenome and/or visualize a random pixie brain
         if num == numberOfGenerations-2:
             if save_metagenome:
                 saveMetaGenome(newWorld, folder_dir)
+
+            # visualize the brain of a random pixie
+            if sample_brain:
+                render.visualizePixieBrain(random.choice(newWorld.inhabitants), directory=folder_dir)
 
         ### nur kurz zum debuggen
         # funcLessGenomes = 0
@@ -1098,9 +1102,9 @@ def simulateGenerations(startingPopulation=None):
 
 # world parameters
 gridsize = 30
-numberOfGenes = 3
+numberOfGenes = 10
 numberOfPixies = 200
-numberOfGenerations = 60
+numberOfGenerations = 100
 numberOfSimSteps = 20
 selectionCriterium = "killRightHalf" # key for selection_criteria dict
 environment_key = 0 # key for environment_dict 
@@ -1119,6 +1123,7 @@ save_metagenome = True
 calc_survivalRate = True
 calc_diversity = True
 generate_mullerplot = True
+sample_brain = True
 
 # render settings
 createGIF = "selected"  # "none", "every" or "selected"
