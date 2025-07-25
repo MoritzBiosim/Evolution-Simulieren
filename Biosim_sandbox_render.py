@@ -112,7 +112,7 @@ def countLineages(inhabitants):
     mullerplot_dicts.append(lineages)
 
     
-def generateMullerPlot(filename="mullerplot.png", directory=None):
+def generateMullerPlot(filename="mullerplot.png", directory=None, realColors=False):
     "generate a stackplot that resembles a Muller Plot by grouping identical individuals"
     "and thus show the lineages making up the population."
     # This muller plot cannot track which mutations arise in which lineages
@@ -128,9 +128,8 @@ def generateMullerPlot(filename="mullerplot.png", directory=None):
         for genome in gen_dict_keys:
             if genome not in genome_tracker:
                 genome_tracker[genome] = []
+
                 unique_genomes.append(genome)
-    
-    colores = [color_dict[genome] for genome in unique_genomes]
 
     # add frequencies for each generation
     for i, generation_dict in enumerate(mullerplot_dicts):
@@ -144,10 +143,21 @@ def generateMullerPlot(filename="mullerplot.png", directory=None):
             if genome not in generation_dict.keys():
                 genome_tracker[genome].append(0)
 
+    # compile the genome keys and frequencies into a list of tuples which can be sorted
+    lineages = [(genome, genome_tracker[genome]) for genome in unique_genomes]
+    lineages.sort(key=lambda x: x[0])
+    lineagesToPlot = [i[1] for i in lineages]
+
+    # sort the colors into a list with the same sorting as lineages
+    if realColors:
+        colores = [color_dict[elem[0]] for elem in lineages]
+    else:
+        colores = None
 
     fig, ax = plt.subplots()
-    ax.stackplot(gen_counter, genome_tracker.values(), colors=colores) # deactivate colors=colores if mutations make graph unclear
-    # ax.legend(loc='upper left')
+    #ax.stackplot(gen_counter, genome_tracker.values(), colors=colores) # deactivate colors=colores if mutations make graph unclear
+    ax.stackplot(gen_counter, lineagesToPlot, colors=colores) # deactivate colors=colores if mutations make graph unclear
+
     ax.set_title('Muller Plot')
     ax.set_xlabel('Generation')
     if directory:

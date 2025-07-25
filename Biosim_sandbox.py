@@ -783,6 +783,26 @@ environment_dict = {
 }
 
 ################################################
+# CONVENIENCE FUNCTIONS (mostly courtesy of ChatGPT)
+
+def hex_to_rgb(hex_color):
+    hex_color = hex_color.lstrip("#")
+    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+
+def rgb_to_hex(rgb):
+    return "".join(f"{max(0, min(255, c)):02x}" for c in rgb) # or "#" + "".join
+
+def generate_similar_color(hex_color, variation=20):
+    """Gibt eine ähnliche Farbe zum Original-Hexcode zurück.
+    variation = max. Abweichung pro Farbkanal (0–255)"""
+    rgb = hex_to_rgb(hex_color)
+    similar_rgb = tuple(
+        max(0, min(255, c + random.randint(-variation, variation)))
+        for c in rgb
+    )
+    return rgb_to_hex(similar_rgb)
+
+################################################
 # SIMULATOR FUNCTIONS
 
 def eachSimStep(world, gen=None):
@@ -832,6 +852,17 @@ def spawnPixie(world, inheritedDNA=None, newHexColor=None):
     newPixieName = pixie(worldToInhabit=world, name=newPixieName, yxPos=newYXPos, inheritedDNA=inheritedDNA, color=newHexColor)
     world.updateWorld()
 
+def inheritPixie(predecessor, newWorld):
+    inheritedGenes = ([neurolink.DNA for neurolink in predecessor.genome.genes], predecessor.genome.mutator)
+    possiblyMutatedDNA = mutateGenes(gene_list=inheritedGenes)
+
+    if inheritedGenes[0] == possiblyMutatedDNA:
+        inheritedColor = predecessor.color 
+    else:
+        inheritedColor = generate_similar_color(predecessor.color, variation=color_variation)
+    print(".")
+    spawnPixie(newWorld, inheritedDNA=possiblyMutatedDNA, newHexColor=inheritedColor)
+
 def newGeneration(oldWorld=None, existingGenomes=None):
     "spawn a new generation"
 
@@ -845,19 +876,17 @@ def newGeneration(oldWorld=None, existingGenomes=None):
             for i in range(numberOfPixies):
                 predecessor = random.choice(oldPopulation)
 
-                inheritedGenes = ([neurolink.DNA for neurolink in predecessor.genome.genes], predecessor.genome.mutator)
-                possiblyMutatedDNA = mutateGenes(gene_list=inheritedGenes)
-
-                inheritedColor = predecessor.color # this doesn't allow for color mutations
-
-                spawnPixie(newWorld, inheritedDNA=possiblyMutatedDNA, newHexColor=inheritedColor)
+                inheritPixie(predecessor=predecessor, newWorld=newWorld)
         else:
             for predecessor in oldPopulation:
                 "each surviving pixie produces one offspring"
                 inheritedGenes = ([neurolink.DNA for neurolink in predecessor.genome.genes], predecessor.genome.mutator)
                 possiblyMutatedDNA = mutateGenes(gene_list=inheritedGenes)
 
-                inheritedColor = predecessor.color # this doesn't allow for color mutations
+                if inheritedGenes[0] == possiblyMutatedDNA:
+                    inheritedColor = predecessor.color 
+                else:
+                    inheritedColor = generate_similar_color(predecessor.color, variation=color_variation)
 
                 spawnPixie(newWorld, inheritedDNA=possiblyMutatedDNA, newHexColor=inheritedColor)
 
@@ -868,7 +897,10 @@ def newGeneration(oldWorld=None, existingGenomes=None):
                 inheritedGenes = ([neurolink.DNA for neurolink in predecessor.genome.genes], predecessor.genome.mutator)
                 possiblyMutatedDNA = mutateGenes(gene_list=inheritedGenes)
 
-                inheritedColor = predecessor.color # this doesn't allow for color mutations
+                if inheritedGenes[0] == possiblyMutatedDNA:
+                    inheritedColor = predecessor.color 
+                else:
+                    inheritedColor = generate_similar_color(predecessor.color, variation=color_variation)
 
                 spawnPixie(newWorld, inheritedDNA=possiblyMutatedDNA, newHexColor=inheritedColor)
 
@@ -890,15 +922,13 @@ def mutateGenes(gene_list):
     "iterate through the DNA bits and change it with a small chance"
     genes, mutator = gene_list
 
+    mutatedGenes = []
     for gene in genes:
-        # for i in range(len(gene)):
-        #     if random.random() < mutationRate:
-        #         gene[i] = "1" if gene[i] == "0" else "0"
-        #         gene = "".join(["1" if bit == "0" else "0" for bit in gene if random.random() < mutationRate])
         mutChance = mutationRate * mutator
         
-        gene = "".join(["1" if bit == "0" and random.random() < mutChance else "0" if bit == "1" and random.random() < mutChance else bit for bit in gene])
-    return genes
+        mut_gene = "".join(["1" if bit == "0" and random.random() < mutChance else "0" if bit == "1" and random.random() < mutChance else bit for bit in gene])
+        mutatedGenes.append(mut_gene)
+    return mutatedGenes
 
 def saveMetaGenome(world, newDir):
     "save the Genomes of all pixies in a csv file"
@@ -1074,17 +1104,17 @@ def simulateGenerations(startingPopulation=None):
     if calc_survivalRate or calc_diversity:
         render.calcSurvivalAndDiversity(selCrit=selectionCriterium, list_survival=survivalRateOverTime, list_diversity=diversityOverTime, directory=folder_dir)
     if generate_mullerplot:
-        render.generateMullerPlot(directory=folder_dir)
+        render.generateMullerPlot(directory=folder_dir, realColors=mullerplot_realColors)
 
 
 ################################################
 # PARAMETERS
 
 # world parameters
-gridsize = 20
-numberOfGenes = 6
-numberOfPixies = 30
-numberOfGenerations = 20
+gridsize = 30
+numberOfGenes = 3
+numberOfPixies = 200
+numberOfGenerations = 60
 numberOfSimSteps = 20
 selectionCriterium = "killRightHalf" # key for selection_criteria dict
 environment_key = 0 # key for environment_dict 
@@ -1093,7 +1123,7 @@ geneticDrift = True # if False, then each surviving pixie automatically produces
 mortalityRate = 1.0 # chance, that a pixie is killed by selectionCriterium
 
 # pixie parameters
-mutationRate = 0.01
+mutationRate = 0.0001
 defaultEnergy = 0
 energyDeficitPerMove = 0
 energyDeficitPerSimStep = 0
@@ -1103,10 +1133,14 @@ save_metagenome = True
 calc_survivalRate = True
 calc_diversity = True
 generate_mullerplot = True
+
+# render settings
 createGIF = "selected"  # "none", "every" or "selected"
 GIF_resolution = 10 # number of pixels = width of a cell
 createGIFevery = 1
 createGIFfor = [numberOfGenerations, 1, 2, 3, 5, 10, 20, 50, 100, 200, 300, 400, 500]
+mullerplot_realColors = True # should the colors in the muller plot resemble the colors in the GIFs?
+color_variation = 20 # regulates how similar the color of two mutated lineages are (default: 20)
 
 survivalRateOverTime = [] # list containing survivalrate for each generation
 diversityOverTime = [] 
@@ -1115,3 +1149,4 @@ sexualityOverTime = []
 
 simulateGenerations()
 #simulateGenerations(readMetaGenome("metagenome.txt")) # a metagenome object can be provided as an argument if a previous population 
+#simulateGenerations(readMetaGenome("clonal_population.txt"))
