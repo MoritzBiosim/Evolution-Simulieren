@@ -853,6 +853,8 @@ def spawnPixie(world, inheritedDNA=None, newHexColor=None):
     world.updateWorld()
 
 def inheritPixie(predecessor, newWorld):
+    "get the DNA and color from the predecessor, mutate it, and spawn a new pixie"
+    
     inheritedGenes = ([neurolink.DNA for neurolink in predecessor.genome.genes], predecessor.genome.mutator)
     possiblyMutatedDNA = mutateGenes(gene_list=inheritedGenes)
 
@@ -860,7 +862,7 @@ def inheritPixie(predecessor, newWorld):
         inheritedColor = predecessor.color 
     else:
         inheritedColor = generate_similar_color(predecessor.color, variation=color_variation)
-    print(".")
+
     spawnPixie(newWorld, inheritedDNA=possiblyMutatedDNA, newHexColor=inheritedColor)
 
 def newGeneration(oldWorld=None, existingGenomes=None):
@@ -880,29 +882,13 @@ def newGeneration(oldWorld=None, existingGenomes=None):
         else:
             for predecessor in oldPopulation:
                 "each surviving pixie produces one offspring"
-                inheritedGenes = ([neurolink.DNA for neurolink in predecessor.genome.genes], predecessor.genome.mutator)
-                possiblyMutatedDNA = mutateGenes(gene_list=inheritedGenes)
-
-                if inheritedGenes[0] == possiblyMutatedDNA:
-                    inheritedColor = predecessor.color 
-                else:
-                    inheritedColor = generate_similar_color(predecessor.color, variation=color_variation)
-
-                spawnPixie(newWorld, inheritedDNA=possiblyMutatedDNA, newHexColor=inheritedColor)
+                inheritPixie(predecessor=predecessor, newWorld=newWorld)
 
             while len(newWorld.inhabitants) < numberOfPixies:
                 "fill up the rest with randomly chosen pixies"
                 predecessor = random.choice(oldPopulation)
 
-                inheritedGenes = ([neurolink.DNA for neurolink in predecessor.genome.genes], predecessor.genome.mutator)
-                possiblyMutatedDNA = mutateGenes(gene_list=inheritedGenes)
-
-                if inheritedGenes[0] == possiblyMutatedDNA:
-                    inheritedColor = predecessor.color 
-                else:
-                    inheritedColor = generate_similar_color(predecessor.color, variation=color_variation)
-
-                spawnPixie(newWorld, inheritedDNA=possiblyMutatedDNA, newHexColor=inheritedColor)
+                inheritPixie(predecessor=predecessor, newWorld=newWorld)
 
     else: # inherit genes from predetermined Populations
         newWorld = world(size=gridsize)
