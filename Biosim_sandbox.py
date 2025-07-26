@@ -94,6 +94,7 @@ class pixie(object):
         self.inheritedDNA = inheritedDNA
         self.shape = "round"
         self.facing = 0 
+        self.repr_cooldown = defaultReproductionCooldown
 
         # variables to track the "movement urge" in each simstep. These get reset every new simstep
         self.moveX = 0
@@ -767,7 +768,9 @@ selection_criteria = {
     "killMiddle": lambda x, y: selection.killMiddle(x, y),
     "killEdges": lambda x, y: selection.killEdges(x, y),
     "killLowEnergy": lambda x, y: selection.killLowEnergy(x, y),
-    "killEdges&LowEnergy": lambda x, y: selection.killEdges_LowEnergy(x, y)
+    "killEdges&LowEnergy": lambda x, y: selection.killEdges_LowEnergy(x, y),
+    "killSwitchingSides": lambda x, y, gen: selection.killSwitchingSides(x, y, gen),
+    "killRandomHalf": lambda x, y: selection.killRandomHalf(x, y)
 }
 
 ################################################
@@ -804,6 +807,9 @@ def generate_similar_color(hex_color, variation=20):
 
 ################################################
 # SIMULATOR FUNCTIONS
+# normal simulation setup: one generation has a fixed amount of simSteps, 
+# after which a selection criterium is applied and all pixies that don't
+# suffice the criteria are removed.
 
 def eachSimStep(world, gen=None):
     ""
@@ -812,6 +818,10 @@ def eachSimStep(world, gen=None):
         pixie.executeGenome()
         pixie.executeMove()
         pixie.energy -= energyDeficitPerSimStep
+        if pixie.energy < 0:
+            pixie.energy = 0
+
+        
 
     # execute all actions that have been queued:
     # for pixie in world.queueForMove:
@@ -1096,18 +1106,174 @@ def simulateGenerations(startingPopulation=None):
     if generate_mullerplot:
         render.generateMullerPlot(directory=folder_dir, realColors=mullerplot_realColors)
 
+################################################
+# CONTINUOUS SIMULATION SETUP
+# pixies reproduce live, and a generation does'nt end after a set amount of simsteps,
+# but when the amount of pixies has reached a certain treshold.
+
+def duplicatePixie(world, predecessor):
+    "spawn a new, (almost) identical pixie next to the current one"
+
+    # check if max number of pixies is already reached
+    if len(world.inhabitants) >= endPopSize:
+        return
+    
+    newPixieName = "Pixie_" + str(random.randint(0,9999))
+
+    inheritedGenes = ([neurolink.DNA for neurolink in predecessor.genome.genes], predecessor.genome.mutator)
+    possiblyMutatedDNA = mutateGenes(gene_list=inheritedGenes)
+
+    if inheritedGenes[0] == possiblyMutatedDNA:
+        inheritedColor = predecessor.color 
+    else:
+        inheritedColor = generate_similar_color(predecessor.color, variation=color_variation)
+
+    # check if a neighbouring cell is empty
+    yPos, xPos = predecessor.yxPos
+    for y in (max(0, yPos-1), yPos, min(gridsize-1, yPos+1)):
+        for x in (max(0, xPos-1), xPos, min(gridsize-1, xPos+1)):
+            if world.grid[y][x] == None:
+                newPixieName = pixie(worldToInhabit=world, name=newPixieName, yxPos=(y,x), inheritedDNA=possiblyMutatedDNA, color=inheritedColor)
+                world.updateWorld()
+                predecessor.repr_cooldown = defaultReproductionCooldown
+                return
+
+def eachSimStep_continuous(world, gen=None):
+    ""
+    # execute the genome for each pixie in the world
+    for pixie in world.getInhabitants():
+        pixie.executeGenome()
+        pixie.executeMove()
+        pixie.energy -= energyDeficitPerSimStep
+        if pixie.energy < 0:
+            pixie.energy = 0
+        pixie.repr_cooldown -= 1
+        if pixie.repr_cooldown < 0:
+            pixie.repr_cooldown = 0
+
+
+    # execute all actions that have been queued:
+    for pixie in world.queueForKill:
+        world.inhabitants.remove(pixie)
+        
+    world.queueForMove = set() # (obsolete)
+    world.queueForKill = set()
+
+    world.updateWorld()
+
+    # let all pixies who are ready reproduce
+    for pixie in world.getInhabitants():
+        if pixie.repr_cooldown <= 0:
+            duplicatePixie(world, pixie)
+
+    # create a frame for the gif
+    if createGIF != "none":  
+        if gen:
+            if createGIF == "selected" and gen in createGIFfor:
+                render.render(world, circleDiameter=GIF_resolution)
+            elif createGIF == "every" and (gen) % createGIFevery == 0:
+                render.render(world, circleDiameter=GIF_resolution)
+            
+        else: 
+            render.render(world, circleDiameter=GIF_resolution)
+
+def startNewColony(oldWorld= None, existingGenomes=None):
+    "spawn a new generation as a sample of the old population"
+
+    if oldWorld: # inherit genes from the predecessing generation
+        oldPopulation = oldWorld.inhabitants
+        newWorld = world(size=gridsize)
+        #create environment
+        environment_dict[environment_key](newWorld)
+
+        for i in range(startingPopSize):
+            predecessor = random.choice(oldPopulation)
+
+            inheritPixie(predecessor=predecessor, newWorld=newWorld)
+
+    else: # inherit genes from predetermined Populations
+        newWorld = world(size=gridsize)
+        # create environment
+        environment_dict[environment_key](newWorld)
+
+        if existingGenomes:
+            uniformColor = "%06x" % random.randint(0,0xFFFFFF)
+            for genome in existingGenomes:
+                spawnPixie(newWorld, inheritedDNA=genome, newHexColor=uniformColor)
+        else: # generate new genes from scratch
+            for i in range(startingPopSize):
+                spawnPixie(newWorld)
+    
+    return newWorld
+
+def simulateContinuous(startingPopulation=None):
+
+    print("simulating...")
+    start_time = time.time()
+
+    now = datetime.now().strftime("%Y-%m-%d-%H-%M")
+    folder_dir = Path("Biosim_run_" + now)
+    folder_dir.mkdir(parents=True, exist_ok=True)
+
+    oldWorld = None
+    for i in range(numberOfGenerations):
+        print("gen", i+1)
+        if i == 0: 
+            newWorld = startNewColony(existingGenomes=startingPopulation)
+        else:
+            newWorld = startNewColony(oldWorld=oldWorld)
+        calculateDiversity(newWorld)
+        render.countLineages(newWorld.inhabitants)
+
+        ss = 0
+        while len(newWorld.inhabitants) < endPopSize:
+            eachSimStep_continuous(newWorld, gen=i+1)
+            ss += 1
+            if ss >= maxSimSteps:
+                break
+
+        # create a GIF
+        if createGIF != "none":
+            if createGIF == "every":
+                if (i+1) % createGIFevery == 0:
+                    render.create_gif(filename=f"world_{i+1}.gif", directory=folder_dir)
+            elif createGIF == "selected":
+                if (i+1) in createGIFfor:
+                    render.create_gif(filename=f"world_{i+1}.gif", directory=folder_dir)
+
+                    if sample_brain:
+                        render.visualizePixieBrain(random.choice(newWorld.inhabitants), directory=folder_dir, filename=f"sample_brain_gen{i+1}")
+
+
+            oldWorld = newWorld
+
+            # in the last world, save the metagenome and/or visualize a random pixie brain
+            if i == numberOfGenerations-1:
+                if save_metagenome:
+                    saveMetaGenome(newWorld, folder_dir)
+
+    print("all done!")
+    print(f"time elapsed: {time.time() - start_time} seconds")
+
+    if generate_mullerplot:
+        render.generateMullerPlot(directory=folder_dir, realColors=mullerplot_realColors)
+        
+startingPopSize = 50
+endPopSize = 500
+maxSimSteps = 1000
+defaultReproductionCooldown = 20
 
 ################################################
 # PARAMETERS
 
 # world parameters
-gridsize = 30
+gridsize = 50
 numberOfGenes = 10
 numberOfPixies = 200
-numberOfGenerations = 100
+numberOfGenerations = 5
 numberOfSimSteps = 20
 selectionCriterium = "killRightHalf" # key for selection_criteria dict
-environment_key = 0 # key for environment_dict 
+environment_key = 3 # key for environment_dict 
 
 geneticDrift = True # if False, then each surviving pixie automatically produces at least one offspring
 mortalityRate = 1.0 # chance, that a pixie is killed by selectionCriterium
@@ -1138,6 +1304,9 @@ diversityOverTime = []
 sexualityOverTime = []
 
 
-simulateGenerations()
+#simulateGenerations()
 #simulateGenerations(readMetaGenome("metagenome.txt")) # a metagenome object can be provided as an argument if a previous population 
 #simulateGenerations(readMetaGenome("clonal_population.txt"))
+
+simulateContinuous()
+#simulateContinuous(startingPopulation=readMetaGenome("clonal_population_eatFood.txt"))

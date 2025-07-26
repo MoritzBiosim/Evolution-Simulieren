@@ -982,6 +982,7 @@ class eatFood(actionN):
                 if nearestFood[1] <= math.sqrt(2): # if food is in a neighbouring cell
 
                     self.attributedPixie.energy += nearestFood[0].energy
+                    self.attributedPixie.repr_cooldown -= 10
                     self.attributedPixie.worldToInhabit.environment.remove(nearestFood[0])
                     self.attributedPixie.worldToInhabit.updateWorld()
 

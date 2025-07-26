@@ -136,7 +136,7 @@ def generateMullerPlot(filename="mullerplot.png", directory=None, realColors=Fal
 
     # add frequencies for each generation
     for i, generation_dict in enumerate(mullerplot_dicts):
-        gen_counter.append(i)
+        gen_counter.append(i+1)
         
         # assign current frequency to the corresponding element in genome_tracker
         for genome in generation_dict.keys():
@@ -173,7 +173,7 @@ def generateMullerPlot(filename="mullerplot.png", directory=None, realColors=Fal
 
 
 ## mostly chatGPT:
-def visualizePixieBrain(pixie, directory=None):
+def visualizePixieBrain(pixie, directory=None, filename=None):
     def neuron_level(neuron):
         bases = inspect.getmro(neuron.__class__)
         if n.sensorN in bases:
@@ -200,7 +200,7 @@ def visualizePixieBrain(pixie, directory=None):
     # Positionen vorbereiten
     positions = {}
     radius = 0.5
-    y_spacing = 1.5
+    y_spacing = 2
     layer_y = {'sensor': y_spacing * 2, 'internal': y_spacing, 'action': 0}
 
     plt.figure(figsize=(12, 8))
@@ -211,7 +211,7 @@ def visualizePixieBrain(pixie, directory=None):
         count = len(neuron_list)
         if count == 0:
             continue
-        spacing = 2.5
+        spacing = 1.5
         x_start = - (count - 1) * spacing / 2
         for i, neuron in enumerate(neuron_list):
             x = x_start + i * spacing
@@ -259,15 +259,15 @@ def visualizePixieBrain(pixie, directory=None):
         offset_count = connection_count.get(key, 0)
         connection_count[key] = offset_count + 1
 
-        offset_magnitude = 0.2 * offset_count
-        angle_offset = random.uniform(-0.3, 0.3)  # etwas zufälliger Winkeloffset
+        offset_magnitude = 0.1 * offset_count
         perp_dx = -dy / length
         perp_dy = dx / length
 
-        x1s += perp_dx * offset_magnitude + random.uniform(-0.05, 0.05)
-        y1s += perp_dy * offset_magnitude + random.uniform(-0.05, 0.05)
-        x2s += perp_dx * offset_magnitude + random.uniform(-0.05, 0.05)
-        y2s += perp_dy * offset_magnitude + random.uniform(-0.05, 0.05)
+        rand_offset = 0.03 # control the amount of "jitter" in the arrows
+        x1s += perp_dx * offset_magnitude + random.uniform(-rand_offset, rand_offset)
+        y1s += perp_dy * offset_magnitude + random.uniform(-rand_offset, rand_offset)
+        x2s += perp_dx * offset_magnitude + random.uniform(-rand_offset, rand_offset)
+        y2s += perp_dy * offset_magnitude + random.uniform(-rand_offset, rand_offset)
 
         arrow = FancyArrowPatch(
             (x1s, y1s), (x2s, y2s),
@@ -286,8 +286,12 @@ def visualizePixieBrain(pixie, directory=None):
     ax.set_aspect('equal')
     plt.title("Pixie Brain Visualization")
     plt.tight_layout()
+    if filename:
+        file_name = filename 
+    else:
+        file_name = "sample_brain.png"
     if directory:
-        save_dir = directory / "sample_brain.png"
+        save_dir = directory / file_name
         plt.savefig(save_dir)
     else:
         plt.show()
