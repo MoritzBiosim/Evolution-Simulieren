@@ -4,6 +4,7 @@ import math
 import time
 from datetime import datetime
 from pathlib import Path
+from numba import njit
 import Biosim_sandbox_render as render
 import Biosim_sandbox_neurons as neurons
 import Biosim_sandbox_selection as selection
@@ -146,17 +147,22 @@ class pixie(object):
         
         world = self.worldToInhabit # this makes providing the argument "world" obsolete
 
+        destination_coords = (int(self.yxPos[0]+vector[0]), int(self.yxPos[1]+vector[1]))
+
         if self.yxPos[1]+vector[1] < 0 or self.yxPos[1]+vector[1] > np.size(world.grid, 0)-1:
             # out of bounds
             return
         if self.yxPos[0]+vector[0] < 0 or self.yxPos[0]+vector[0] > np.size(world.grid, 0)-1:
             # out of bounds
             return
-        if world.grid[(int(self.yxPos[0]+vector[0]), int(self.yxPos[1]+vector[1]))]:
+        if blockedByOtherPixies and world.grid[destination_coords]:
             # cell already inhabited
             return
+        elif isinstance(world.grid[destination_coords], environment.object):
+            # barrier
+            return
         else:
-            self.yxPos = (int(self.yxPos[0]+vector[0]), int(self.yxPos[1]+vector[1])) # moving
+            self.yxPos = destination_coords # moving
             self.facing = self.getRelativeAngle(relVector=vector) # update "facing"-direction
 
             world.updateWorld() 
@@ -222,13 +228,16 @@ class pixie(object):
         searchRadius = int(self.genome.searchRadius) #consistency??
 
         foundObjects = []
-        gridSize = np.size(world.grid, 0) # edge length of the grid (only works for square grids)
+        gridSize = world.size # edge length of the grid (only works for square grids)
 
-        for x in range(max(0, self.yxPos[1] - searchRadius), min(gridSize, self.yxPos[1] + searchRadius)):
-            for y in range(max(0, self.yxPos[0] - searchRadius), min(gridSize, self.yxPos[0] + searchRadius)):
-                if math.sqrt((x-self.yxPos[1])**2 + (y - self.yxPos[0])**2) <= searchRadius:
-                    if world.grid[y,x] and world.grid[y,x] != self:
-                        foundObjects.append(world.grid[y,x])
+        y0, x0 = self.yxPos
+
+        for x in range(max(0, x0 - searchRadius), min(gridSize, x0 + searchRadius)):
+            for y in range(max(0, y0 - searchRadius), min(gridSize, y0 + searchRadius)):
+                if in_search_radius(y0, x0, y, x, searchRadius):
+                    obj = world.grid[y, x]
+                    if obj and obj != self:
+                        foundObjects.append(obj)
         return foundObjects
     
     def getAllEuclidianDistances(self):
@@ -238,12 +247,15 @@ class pixie(object):
         outlist = []
 
         for neighbour in self.searchNeighbourhood():
+            
+            y0, x0 = self.yxPos
+            y1, x1 = neighbour.yxPos
+            # dx = neighbour.yxPos[1] - self.yxPos[1]
+            # dy = neighbour.yxPos[0] - self.yxPos[0]
 
-            dx = neighbour.yxPos[1] - self.yxPos[1]
-            dy = neighbour.yxPos[0] - self.yxPos[0]
-
-            distance = math.sqrt(dx**2 + dy**2)
-            outlist.append((neighbour, distance))
+            # distance = math.sqrt(dx**2 + dy**2)
+            # outlist.append((neighbour, distance))
+            outlist.append((neighbour, euclidian_distance_numba(y0, x0, y1, x1)))
         return outlist
     
     def getNearest(self):
@@ -280,11 +292,13 @@ class pixie(object):
     def getEuclidianDistance(self, otherObject):
         "returns the absolute distance between the referenced object and self"
 
-        dx = otherObject.yxPos[1] - self.yxPos[1]
-        dy = otherObject.yxPos[0] - self.yxPos[0]
+        # dx = otherObject.yxPos[1] - self.yxPos[1]
+        # dy = otherObject.yxPos[0] - self.yxPos[0]
 
-        distance = math.sqrt(dx**2 + dy**2)
-        return distance
+        # distance = math.sqrt(dx**2 + dy**2)
+        # return distance
+        return euclidian_distance_numba(self.yxPos[0], self.yxPos[1], otherObject.yxPos[0], otherObject.yxPos[1])
+
 
     def getRelativeVector(self, otherObject):
         """returns a twodimensional tuple containing the y- and x-position of the 
@@ -805,6 +819,18 @@ def generate_similar_color(hex_color, variation=20):
     )
     return rgb_to_hex(similar_rgb)
 
+@njit
+def euclidian_distance_numba(y1, x1, y2, x2):
+    dy = y2 - y1
+    dx = x2 - x1
+    return (dx * dx + dy * dy) ** 0.5
+
+@njit
+def in_search_radius(y0, x0, y, x, radius):
+    dy = y - y0
+    dx = x - x0
+    return (dx * dx + dy * dy) <= (radius * radius)
+
 ################################################
 # SIMULATOR FUNCTIONS
 # normal simulation setup: one generation has a fixed amount of simSteps, 
@@ -871,6 +897,8 @@ def inheritPixie(predecessor, newWorld):
     if inheritedGenes[0] == possiblyMutatedDNA:
         inheritedColor = predecessor.color 
     else:
+        # mutationTypes = [categorizeMutation(inheritedGenes[0][i], possiblyMutatedDNA[i]) for i in range(len(inheritedGenes[0]))]
+        # print(mutationTypes)
         inheritedColor = generate_similar_color(predecessor.color, variation=color_variation)
 
     spawnPixie(newWorld, inheritedDNA=possiblyMutatedDNA, newHexColor=inheritedColor)
@@ -926,53 +954,6 @@ def mutateGenes(gene_list):
         mutatedGenes.append(mut_gene)
     return mutatedGenes
 
-def saveMetaGenome(world, newDir):
-    "save the Genomes of all pixies in a csv file"
-
-    # genes contains neurolink objects, which have the attributes .attributedPixie, .DNA, .source, .sink and .weight
-    genomes_list = [inhabitant.genome.genes for inhabitant in world.getInhabitants()]
-
-    filedir = newDir / "metagenome.txt"
-    with open(filedir, "w") as textfile:
-        textfile.write("PixieName,DNA,connections\n")
-        for genes_list in genomes_list:
-            DNA_list = []
-            sources_list = []
-            sinks_list = []
-            weights_list = []
-            connections_list = []
-            pixieName = "placeholder"
-            for neurolink in genes_list:
-                pixieName = neurolink.attributedPixie
-                DNA_list.append(neurolink.DNA)
-                sources_list.append(neurolink.source)
-                sinks_list.append(neurolink.sink)
-                weights_list.append(neurolink.weight)
-
-            connections = zip(sources_list, sinks_list, weights_list)
-            for i in connections:
-                connections_list.append(str(i))
-            connections_str = ";".join(connections_list)
-            DNA_str = ";".join(DNA_list)
-
-            textfile.write(f"{pixieName},{DNA_str},{connections_str}\n")
-
-def readMetaGenome(textfile):
-    "read the metagenome textfile and extract the DNA of each Pixie, and save it in a list"
-
-    metagenome = []
-
-    with open(textfile, "r") as metagenome_file:
-        for i, line in enumerate(metagenome_file):
-            if i > 0:
-                elements = line.strip().split(",")
-                # the DNA should be in the second column
-                genome = elements[1].split(";")
-
-                metagenome.append(genome)
-
-    return metagenome
-
 def applySelectionCriteria(world, mortalityRate):
     ""
     # get Function from selection_criteria dict
@@ -982,24 +963,6 @@ def applySelectionCriteria(world, mortalityRate):
     # execute Function
     selectionFunction(world, mortalityRate)
     world.updateWorld()
-
-def calculateDiversity(world):
-    if calc_diversity:
-            unique_genomes = set()
-            for pixie in world.inhabitants: # add the DNA of every gene
-                unique_genomes.add(tuple(x.DNA for x in pixie.genome.genes))
-            #diversity = 1 - (1 / len(unique_genomes))      #len(world.inhabitants) ???
-            diversity = len(unique_genomes) / len(world.inhabitants)
-            diversityOverTime.append(diversity)
-
-def calculateSurvivalRate(world):
-    if calc_survivalRate:
-        survivalRate = len(world.inhabitants) / numberOfPixies       
-        survivalRateOverTime.append(survivalRate)
-
-def calculateSexualityRate(world):
-    sexualityRate = world.sexualityCount / numberOfPixies
-    sexualityOverTime.append(sexualityRate)
 
 def simulateGenerations(startingPopulation=None):
     "Randomly simulate as many generations as specified. Optionally provide a starting Population (metagenome)."
@@ -1105,6 +1068,8 @@ def simulateGenerations(startingPopulation=None):
         render.calcSurvivalAndDiversity(selCrit=selectionCriterium, list_survival=survivalRateOverTime, list_diversity=diversityOverTime, directory=folder_dir)
     if generate_mullerplot:
         render.generateMullerPlot(directory=folder_dir, realColors=mullerplot_realColors)
+    if plot_genefrequencies:
+        render.plotGeneFrqs(directory=folder_dir)
 
 ################################################
 # CONTINUOUS SIMULATION SETUP
@@ -1224,6 +1189,7 @@ def simulateContinuous(startingPopulation=None):
             newWorld = startNewColony(oldWorld=oldWorld)
         calculateDiversity(newWorld)
         render.countLineages(newWorld.inhabitants)
+        render.getGeneFrqs(newWorld.inhabitants)
 
         ss = 0
         while len(newWorld.inhabitants) < endPopSize:
@@ -1257,24 +1223,171 @@ def simulateContinuous(startingPopulation=None):
 
     if generate_mullerplot:
         render.generateMullerPlot(directory=folder_dir, realColors=mullerplot_realColors)
+    if plot_genefrequencies:
+        render.plotGeneFrqs(directory=folder_dir)
         
-startingPopSize = 50
-endPopSize = 500
+startingPopSize = 20
+endPopSize = 200
 maxSimSteps = 1000
 defaultReproductionCooldown = 20
+
+################################################
+# ANALYTICS FUNCTIONS
+
+def calculateDiversity(world):
+    if calc_diversity:
+            unique_genomes = set()
+            for pixie in world.inhabitants: # add the DNA of every gene
+                unique_genomes.add(tuple(x.DNA for x in pixie.genome.genes))
+            #diversity = 1 - (1 / len(unique_genomes))      #len(world.inhabitants) ???
+            diversity = len(unique_genomes) / len(world.inhabitants)
+            diversityOverTime.append(diversity)
+
+def calculateSurvivalRate(world):
+    if calc_survivalRate:
+        survivalRate = len(world.inhabitants) / numberOfPixies       
+        survivalRateOverTime.append(survivalRate)
+
+def calculateSexualityRate(world):
+    sexualityRate = world.sexualityCount / numberOfPixies
+    sexualityOverTime.append(sexualityRate)
+
+def saveMetaGenome(world, newDir):
+    "save the Genomes of all pixies in a csv file"
+
+    # genes contains neurolink objects, which have the attributes .attributedPixie, .DNA, .source, .sink and .weight
+    genomes_list = [inhabitant.genome.genes for inhabitant in world.getInhabitants()]
+
+    filedir = newDir / "metagenome.txt"
+    with open(filedir, "w") as textfile:
+        textfile.write("PixieName,DNA,connections\n")
+        for genes_list in genomes_list:
+            DNA_list = []
+            sources_list = []
+            sinks_list = []
+            weights_list = []
+            connections_list = []
+            pixieName = "placeholder"
+            for neurolink in genes_list:
+                pixieName = neurolink.attributedPixie
+                DNA_list.append(neurolink.DNA)
+                sources_list.append(neurolink.source)
+                sinks_list.append(neurolink.sink)
+                weights_list.append(neurolink.weight)
+
+            connections = zip(sources_list, sinks_list, weights_list)
+            for i in connections:
+                connections_list.append(str(i))
+            connections_str = ";".join(connections_list)
+            DNA_str = ";".join(DNA_list)
+
+            textfile.write(f"{pixieName},{DNA_str},{connections_str}\n")
+
+def readMetaGenome(textfile):
+    "read the metagenome textfile and extract the DNA of each Pixie, and save it in a list"
+
+    metagenome = []
+
+    with open(textfile, "r") as metagenome_file:
+        for i, line in enumerate(metagenome_file):
+            if i > 0:
+                elements = line.strip().split(",")
+                # the DNA should be in the second column
+                genome = elements[1].split(";")
+
+                metagenome.append(genome)
+
+    return metagenome
+
+def categorizeMutation(oldGene, newGene):
+    "categorize if a mutation is synonymous or nonsynonymous"
+
+    if len(oldGene) != len(newGene):
+        raise IndexError("genes not the same length!") #should never ever happen
+    
+    if oldGene == newGene:
+        return "identical"
+
+    for i in range(len(oldGene)): # compare the DNA string
+        # weight sign flip (vorzeichenwechsel):
+        if oldGene[16] != newGene[16]:
+            return "nonsynonymous"
+        # compare to what the sources and sinks map
+        else:
+            oldSrc_type = int(oldGene[0], base=2)
+            oldSrc_ID = int(oldGene[1:8], base=2)
+            if oldSrc_type == 0: # source internal neuron
+                normfactor_src = 2**7 / (len(internal_dict)-1)
+                oldSrc_ID = round(oldSrc_ID / normfactor_src)
+            elif oldSrc_type == 1: # source sensor neuron
+                normfactor_src = 2**7 / (len(sensor_dict)-1)
+                oldSrc_ID = round(oldSrc_ID / normfactor_src)
+
+            oldSnk_type = int(oldGene[8], base=2)
+            oldSnk_ID = int(oldGene[9:16], base=2)
+            if oldSnk_type == 0: # source internal neuron
+                normfactor_src = 2**7 / (len(internal_dict)-1)
+                oldSnk_ID = round(oldSnk_ID / normfactor_src)
+            elif oldSnk_type == 1: # source sensor neuron
+                normfactor_src = 2**7 / (len(sensor_dict)-1)
+                oldSnk_ID = round(oldSnk_ID / normfactor_src)
+
+            newSrc_type = int(newGene[0], base=2)
+            newSrc_ID = int(newGene[1:8], base=2)
+            if newSrc_type == 0: # source internal neuron
+                normfactor_src = 2**7 / (len(internal_dict)-1)
+                newSrc_ID = round(newSrc_ID / normfactor_src)
+            elif newSrc_type == 1: # source sensor neuron
+                normfactor_src = 2**7 / (len(sensor_dict)-1)
+                newSrc_ID = round(newSrc_ID / normfactor_src)
+
+            newSnk_type = int(newGene[8], base=2)
+            newSnk_ID = int(newGene[9:16], base=2)
+            if newSnk_type == 0: # source internal neuron
+                normfactor_src = 2**7 / (len(internal_dict)-1)
+                newSnk_ID = round(newSnk_ID / normfactor_src)
+            elif newSnk_type == 1: # source sensor neuron
+                normfactor_src = 2**7 / (len(sensor_dict)-1)
+                newSnk_ID = round(newSnk_ID / normfactor_src)
+
+            if oldSrc_type != newSrc_type or oldSnk_type != newSnk_type:
+                return "nonsynonymous"
+            elif oldSrc_ID != newSrc_ID or oldSnk_ID != newSnk_ID:
+                return "nonsynonymous"
+            else:
+                return "synonymous"
+
+    # # or, way easier, if working with neurolink objects:
+    # oldSrc = oldGene.source.__class__
+    # newSrc = newGene.source.__class__
+    # oldSnk = oldGene.sink.__class__
+    # newSnk = newGene.sink.__class__
+    # oldWeight = oldGene.weight
+    # newWeight = newGene.weight
+    # # check if weight sign is different:
+    # if oldWeight * newWeight < 0:
+    #     return "nonsynonymous"
+    # elif oldSrc != newSrc:
+    #     return "nonsynonymous"
+    # elif oldSnk != newSnk:
+    #     return "nonsynonymous"
+    # else: 
+    #     return "synonymous"
+
 
 ################################################
 # PARAMETERS
 
 # world parameters
-gridsize = 50
+gridsize = 40
 numberOfGenes = 10
 numberOfPixies = 200
-numberOfGenerations = 5
+numberOfGenerations = 30
 numberOfSimSteps = 20
 selectionCriterium = "killRightHalf" # key for selection_criteria dict
-environment_key = 3 # key for environment_dict 
+environment_key = 1 # key for environment_dict 
 
+blockedByOtherPixies = False # if False, pixies can clip through other pixies
 geneticDrift = True # if False, then each surviving pixie automatically produces at least one offspring
 mortalityRate = 1.0 # chance, that a pixie is killed by selectionCriterium
 
@@ -1285,16 +1398,17 @@ energyDeficitPerMove = 0
 energyDeficitPerSimStep = 0
 
 # analytics
-save_metagenome = True
-calc_survivalRate = True
-calc_diversity = True
-generate_mullerplot = True
-sample_brain = True
+save_metagenome = False
+calc_survivalRate = False
+calc_diversity = False
+generate_mullerplot = False
+plot_genefrequencies = False
+sample_brain = False
 
 # render settings
 createGIF = "selected"  # "none", "every" or "selected"
 GIF_resolution = 10 # number of pixels = width of a cell
-createGIFevery = 1
+createGIFevery = 1 # generate a GIF every ... generations
 createGIFfor = [numberOfGenerations, 1, 2, 3, 5, 10, 20, 50, 100, 200, 300, 400, 500]
 mullerplot_realColors = True # should the colors in the muller plot resemble the colors in the GIFs?
 color_variation = 20 # regulates how similar the color of two mutated lineages are (default: 20)
@@ -1304,9 +1418,9 @@ diversityOverTime = []
 sexualityOverTime = []
 
 
-#simulateGenerations()
+simulateGenerations()
 #simulateGenerations(readMetaGenome("metagenome.txt")) # a metagenome object can be provided as an argument if a previous population 
 #simulateGenerations(readMetaGenome("clonal_population.txt"))
 
-simulateContinuous()
+#simulateContinuous()
 #simulateContinuous(startingPopulation=readMetaGenome("clonal_population_eatFood.txt"))

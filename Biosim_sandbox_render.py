@@ -11,6 +11,7 @@ import Biosim_sandbox_neurons as n
 gif_frames = []
 mullerplot_dicts = []
 color_dict = {}
+genefrqs = []
 # aufzurufen als render.render(grid0)
 def render(world, circleDiameter=30, spacing=0, show_image=False):
 
@@ -172,6 +173,69 @@ def generateMullerPlot(filename="mullerplot.png", directory=None, realColors=Fal
         plt.show()
 
 
+def getGeneFrqs(inhabitants):
+    "count the gene frequencies of the current generation"
+    # extract the genes of every individual and add them to genefrqs_dict
+    # count how many of the inhabitants have that gene and divide that number by the total number of inhabitants
+    # append that number to the list attached to the gene=key of genefrqs_dict
+
+    genefrqs_dict = {}
+    for indiv in inhabitants:
+        dna = [hex(int(neurolink.DNA, 2))[2:] for neurolink in indiv.genome.genes] # this is a list of hexcode strings
+        for gene in dna:
+            genefrqs_dict[gene] = None
+
+    for gene in genefrqs_dict.keys():
+        i = 0
+        for individual in inhabitants:
+            dna = [hex(int(neurolink.DNA, 2))[2:] for neurolink in individual.genome.genes]
+            if any(g == gene for g in dna):
+                i +=1
+        frq = i / len(inhabitants)
+        genefrqs_dict[gene] = frq
+    
+    # append genefrqs_dict to genefrqs
+    genefrqs.append(genefrqs_dict)
+
+def plotGeneFrqs(filename="gene_frequencies.png", directory=None):
+    "compile all gene frequencies and plot them over all generations"
+
+    unique_genes = []
+    gene_tracker = {}
+    gen_counter = []
+    # get all unique genes
+    for generation in genefrqs:
+        keys = generation.keys()
+        for gene in keys:
+            if gene not in gene_tracker:
+                gene_tracker[gene] = []
+
+                unique_genes.append(gene)
+    
+    # add frequencies for each generation
+    for i, generation in enumerate(genefrqs):
+        gen_counter.append(i+1)
+
+        # assign current frequency to the corresponding element in genome_tracker
+        for gene in generation.keys():
+            gene_tracker[gene].append(generation[gene])
+        # all genomes that don't occur in that generation get a 0 assigned
+        for gene in gene_tracker.keys():
+            if gene not in generation.keys():
+                gene_tracker[gene].append(0)
+
+    fig, ax = plt.subplots()
+    for label, values in gene_tracker.items():
+        ax.plot(gen_counter, values, label=label)
+    ax.set_title("Gene Frequencies")
+    ax.set_xlabel('Generation')
+    if directory:
+        save_dir = directory / filename
+        plt.savefig(save_dir)
+    else:
+        plt.show()
+
+
 ## mostly chatGPT:
 def visualizePixieBrain(pixie, directory=None, filename=None):
     def neuron_level(neuron):
@@ -196,6 +260,8 @@ def visualizePixieBrain(pixie, directory=None, filename=None):
         level = neuron_level(neuron)
         if level in layers:
             layers[level].append(neuron)
+    for layer in layers.keys():
+        layers[layer].sort(key=lambda x: str(x.__class__))
 
     # Positionen vorbereiten
     positions = {}
