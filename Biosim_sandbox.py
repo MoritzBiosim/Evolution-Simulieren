@@ -964,50 +964,80 @@ def applySelectionCriteria(world, mortalityRate):
     selectionFunction(world, mortalityRate)
     world.updateWorld()
 
+def sexyTime(pixie1, pixie2):
+    "have pixies recombine their genes"
+    # this can happen at the end of a generation and won't change the pixies behaviour,
+    # because the neurons are already instantiated.
+    # each recombination event, half of the genes are randomly swapped. This means that the 
+    # DNA variable in the neurolink object of the gene is directly altered, as this is the place
+    # where inheritPixie gets its DNA from.
+
+    #genes1 = pixie1.genome.genes
+    genes1 = [nl.DNA for nl in pixie1.genome.genes]
+    #genes2 = pixie2.genome.genes
+    genes2 = [nl.DNA for nl in pixie2.genome.genes]
+
+    if len(genes1) != len(genes2):
+        raise IndexError("genomes not the same size")
+    genomesize = len(genes1)
+
+    gene_indices = [i for i in range(genomesize)]
+    swap_indices = random.sample(gene_indices, k=genomesize//2) # the loci that get swapped
+
+    for i in swap_indices:
+        pixie1.genome.genes[i].DNA = genes2[i]
+        pixie2.genome.genes[i].DNA = genes1[i]
+
+def sexReproduction(world, percentage_recombine):
+    ""
+    # break x percent of the populations up into pairs
+    # have them recombine
+
+    rec_portion = percentage_recombine / 100
+    rec_num = int(len(world.inhabitants) * rec_portion)
+
+    rec_samples = random.sample(world.inhabitants, rec_num)
+    rec_pairs = []
+    # for i in range(0, rec_num, 2):
+    #     rec_pairs.append((world.inhabitants[i], world.inhabitants[i+1]))
+    while len(rec_samples) >= 2:
+        rec_pairs.append((rec_samples[0], rec_samples[1]))
+        rec_samples = rec_samples[2:]
+
+    for pair in rec_pairs:
+        sexyTime(pair[0], pair[1])
+
 def simulateGenerations(startingPopulation=None):
     "Randomly simulate as many generations as specified. Optionally provide a starting Population (metagenome)."
 
     print("simulating...")
     start_time = time.time()
 
-    # create new parent folder to save all files created in this simulation run
-    now = datetime.now().strftime("%Y-%m-%d-%H-%M")
-    folder_dir = Path("Biosim_run_" + now)
-    folder_dir.mkdir(parents=True, exist_ok=True)
+    if save_metagenome or calc_survivalRate or calc_diversity or generate_mullerplot or plot_genefrequencies or sample_brain:
+        # create new parent folder to save all files created in this simulation run
+        now = datetime.now().strftime("%Y-%m-%d-%H-%M")
+        folder_dir = Path("Biosim_run_" + now)
+        folder_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        folder_dir = None
 
     if gridsize**2 < numberOfPixies:
         raise OverflowError("too many pixies for the grid!")
-
-    # first generation: 
-    firstWorld = newGeneration(existingGenomes=startingPopulation)
-    calculateDiversity(firstWorld)
-    render.countLineages(firstWorld.inhabitants)
-    for i in range(numberOfSimSteps):
-        eachSimStep(firstWorld)
-
-    # kill pixies that don't suffice the selection criteria
-    applySelectionCriteria(firstWorld, mortalityRate)
-
-    # do the render stuff
-    if createGIF != "none":
-        render.render(firstWorld, circleDiameter=GIF_resolution)
-        render.create_gif(filename=f"world_1.gif", directory=folder_dir)
-    if not firstWorld.inhabitants:
-            print("total extinction!!!")
-            return
     
-    calculateSexualityRate(firstWorld)
-    calculateSurvivalRate(firstWorld)
+    oldWorld = None
+    for num in range(numberOfGenerations):
+        # print("gen", num+1)
 
-    # following generations:
-    oldWorld = firstWorld
-    for num in range(numberOfGenerations-1): # -1 because the first world already got created
-        newWorld = newGeneration(oldWorld=oldWorld)
+        if num == 0: # first generation
+            newWorld = newGeneration(existingGenomes=startingPopulation)
+        else: # following generations
+            newWorld = newGeneration(oldWorld=oldWorld)
         calculateDiversity(newWorld)
         render.countLineages(newWorld.inhabitants)
+        render.getGeneFrqs(newWorld.inhabitants)
 
         for i in range(numberOfSimSteps):
-            eachSimStep(newWorld, gen=num+2)
+            eachSimStep(newWorld, gen=num+1)
 
         # kill pixies that don't suffice the selection criteria
         applySelectionCriteria(newWorld, mortalityRate)
@@ -1015,51 +1045,39 @@ def simulateGenerations(startingPopulation=None):
             print("total extinction!!!")
             break
 
+        # do recombination
+        if sex:
+            if (num+1) % recomb_frequency == 0:
+                sexReproduction(newWorld, recomb_percentage)
+
+        # render the last frame one additional time to make it better visible
         if createGIF != "none":
-            if createGIF == "every" and (num+2) % createGIFevery == 0:
+            if createGIF == "every" and (num+1) % createGIFevery == 0:
                 render.render(newWorld, circleDiameter=GIF_resolution)
-            elif createGIF == "selected" and (num+2) in createGIFfor:
+            elif createGIF == "selected" and (num+1) in createGIFfor:
                 render.render(newWorld, circleDiameter=GIF_resolution)
 
         # calculate the survival rate
-        #calculateSexualityRate(firstWorld)
         calculateSurvivalRate(newWorld)
 
         # create a GIF
         if createGIF != "none":
             if createGIF == "every":
-                if (num+2) % createGIFevery == 0:
-                    render.create_gif(filename=f"world_{num+2}.gif", directory=folder_dir)
+                if (num+1) % createGIFevery == 0:
+                    render.create_gif(filename=f"world_{num+1}.gif", directory=folder_dir)
             elif createGIF == "selected":
-                if (num+2) in createGIFfor:
-                    render.create_gif(filename=f"world_{num+2}.gif", directory=folder_dir)
+                if (num+1) in createGIFfor:
+                    render.create_gif(filename=f"world_{num+1}.gif", directory=folder_dir)
 
         oldWorld = newWorld
 
         # in the last world, save the metagenome and/or visualize a random pixie brain
-        if num == numberOfGenerations-2:
+        if num == numberOfGenerations-1:
             if save_metagenome:
                 saveMetaGenome(newWorld, folder_dir)
-
-            # visualize the brain of a random pixie
             if sample_brain:
                 render.visualizePixieBrain(random.choice(newWorld.inhabitants), directory=folder_dir)
 
-        ### nur kurz zum debuggen
-        # funcLessGenomes = 0
-        # for pixie in newWorld.getInhabitants():
-        #     print(pixie, "gene num:", len(pixie.genome.genes))
-        #     if pixie.genome.functioningGenome == False:
-        #         funcLessGenomes += 1
-        #     num_useless = 0
-        #     for neurolink in pixie.genome.genes:
-        #         #print("useless:", neurolink.useless)
-        #         if neurolink.useless:
-        #             num_useless += 1
-        #     print("useless genes:", num_useless)
-        #     print("functioning Genome:", pixie.genome.functioningGenome)
-        #     print("number of neurons:", len(pixie.genome.allNeurons))
-        # print("functionless Genomes:", funcLessGenomes)
     
     print("all done!")
     print(f"time elapsed: {time.time() - start_time} seconds")
@@ -1070,6 +1088,7 @@ def simulateGenerations(startingPopulation=None):
         render.generateMullerPlot(directory=folder_dir, realColors=mullerplot_realColors)
     if plot_genefrequencies:
         render.plotGeneFrqs(directory=folder_dir)
+
 
 ################################################
 # CONTINUOUS SIMULATION SETUP
@@ -1176,9 +1195,12 @@ def simulateContinuous(startingPopulation=None):
     print("simulating...")
     start_time = time.time()
 
-    now = datetime.now().strftime("%Y-%m-%d-%H-%M")
-    folder_dir = Path("Biosim_run_" + now)
-    folder_dir.mkdir(parents=True, exist_ok=True)
+    if save_metagenome or calc_survivalRate or calc_diversity or generate_mullerplot or plot_genefrequencies or sample_brain:
+        now = datetime.now().strftime("%Y-%m-%d-%H-%M")
+        folder_dir = Path("Biosim_run_" + now)
+        folder_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        folder_dir = None
 
     oldWorld = None
     for i in range(numberOfGenerations):
@@ -1379,17 +1401,21 @@ def categorizeMutation(oldGene, newGene):
 # PARAMETERS
 
 # world parameters
-gridsize = 40
+gridsize = 30
 numberOfGenes = 10
-numberOfPixies = 200
-numberOfGenerations = 30
+numberOfPixies = 400
+numberOfGenerations = 100
 numberOfSimSteps = 20
 selectionCriterium = "killRightHalf" # key for selection_criteria dict
 environment_key = 1 # key for environment_dict 
 
+# population parameters
 blockedByOtherPixies = False # if False, pixies can clip through other pixies
 geneticDrift = True # if False, then each surviving pixie automatically produces at least one offspring
 mortalityRate = 1.0 # chance, that a pixie is killed by selectionCriterium
+sex = True
+recomb_frequency = 5 # pixies reproduce sexually every .. generations
+recomb_percentage = 100 # portion of the population that gets randomly selected for sexual reproduction (in percent)
 
 # pixie parameters
 mutationRate = 0.0001
@@ -1399,18 +1425,18 @@ energyDeficitPerSimStep = 0
 
 # analytics
 save_metagenome = False
-calc_survivalRate = False
-calc_diversity = False
-generate_mullerplot = False
-plot_genefrequencies = False
-sample_brain = False
+calc_survivalRate = True
+calc_diversity = True
+generate_mullerplot = True
+plot_genefrequencies = True
+sample_brain = True
 
 # render settings
 createGIF = "selected"  # "none", "every" or "selected"
 GIF_resolution = 10 # number of pixels = width of a cell
 createGIFevery = 1 # generate a GIF every ... generations
-createGIFfor = [numberOfGenerations, 1, 2, 3, 5, 10, 20, 50, 100, 200, 300, 400, 500]
-mullerplot_realColors = True # should the colors in the muller plot resemble the colors in the GIFs?
+createGIFfor = [numberOfGenerations, 1, 2, 3, 5, 10, 20, 50, 100, 200, 300, 400, 500] # selected
+mullerplot_realColors = True # the colors in the muller plot resemble the pixie colors in the GIFs
 color_variation = 20 # regulates how similar the color of two mutated lineages are (default: 20)
 
 survivalRateOverTime = [] # list containing survivalrate for each generation
